@@ -18,6 +18,7 @@ library(patchwork)
 library(rugarch)
 library(knitr)
 library(seasonal)
+library(ggfortify)
 ```
 # Abstract
 Within this report are the findings and conclusions made for a project conducted for Eskom, with a strong focus on the forecasting of peak daily electricity demand and total energy lost due to unplanned outages (UCLF+OCLF). Using historical data from April 1, 2019 to September 13, 2023, a multitude of forecasting techniques and models were employed to produce valuable insights into the energy supply issues faced by South Africa. Thorough analysis of these forecasts by Eskom might enable the mitigation of load shedding and unplanned outages which will ultimately result in more stability in the national grid.
@@ -216,26 +217,22 @@ In order to convert the hourly demand data into daily data such that the peak da
 ```{r}
 #Peak daily demand (Max of the evening period 17:00 - 21:00)
 elec_demand=esk_data_dem|>group_by(Date)|>summarise(peak_demand=max(RSA.Contracted.Demand),fc=max(RSA.Contracted.Forecast))
-esk_forecasts = elec_demand|>filter(Date>="2023-06-14",Date<="2023-09-14")|>select(Date,fc)
+
+#Get associated forecast for that max demand
+esk_forecasts=esk_data_dem|>group_by(Date)|>
+  filter(RSA.Contracted.Demand == max(RSA.Contracted.Demand))|>
+  select(Date,RSA.Contracted.Forecast)|>ungroup()|>as_tsibble(index = Date)
+
 elec_demand=elec_demand|>select(Date,peak_demand)|>as_tsibble(index=Date)|>na.omit()
 gen_out=esk_data_out|>group_by(Date)|>summarise(unplanned_outages=mean(Total.UCLF.OCLF))|>as_tsibble(index=Date)|>na.omit()
 ```
 
 ## 1.8 - Decomposition of data
 
-### 1.8.1 Time plots of cleaned/transformed data
+### 1.8.1 Time plots of cleaned/transformed data with trend plots
 ```{r}
-elec_plot=autoplot(elec_demand)+xlab("Time")+ylab("Peak Demand")
-gen_plot=autoplot(gen_out)+xlab("Time")+ylab("Energy Loss (UCLF+OCLF)")
-
-p_grid = elec_plot / gen_plot
-p_grid
-```
-
-
-### 1.8.2 Data Trend and Seasonality
-```{r}
-# #Decomp MAYBE JUST PUT IN APPENDIX
+elec_plot=autoplot(elec_demand)+xlab("Time")+ylab("Peak Demand")+ggtitle("Time plot for Peak Demand")
+gen_plot=autoplot(gen_out)+xlab("Time")+ylab("Energy Loss (UCLF+OCLF)")+ggtitle("Time plot for Energy Loss")
 dem_trend=elec_demand |>model(STL(peak_demand~trend()))|>
   components() |>
   autoplot(trend)+ggtitle("Trend for Peak Demand")
@@ -244,14 +241,19 @@ gen_trend=gen_out |>model(STL(unplanned_outages~trend()))|>
   components() |>
   autoplot(trend)+ggtitle("Trend for UCLF+OCLF")
 
+time_trend = (elec_plot|dem_trend) / (gen_plot | gen_trend)
+time_trend
+```
 
 
+### 1.8.2 Seasonality
+```{r}
 #Weekly seasonality -- Peaks on weekends
 may_data=elec_demand |>
   filter(format(Date, "%m") == "05") |>
   mutate(Year=as.integer(format(Date, "%Y")),Day=as.integer(format(Date,"%d"))) |>
   as_tsibble(index=Day, key=Year)
-may_dem=autoplot(may_data,peak_demand)+ylab("Peak Demand")+ggtitle("Daily peak demand May 2021 - May 2023")+xlab("Time")
+may_dem=autoplot(may_data,peak_demand)+ylab("Peak Demand")+ggtitle("Peak daily demand May")+xlab("Time")
 
 may_out_data=gen_out |>
   filter(format(Date, "%m") == "05") |>
@@ -259,7 +261,8 @@ may_out_data=gen_out |>
   as_tsibble(index=Day, key=Year)
 may_out=autoplot(may_out_data,unplanned_outages)+ylab("Unplanned Generation Outages")+ggtitle("Energy Lost for May 2022")+xlab("Time")
 
-trendseason_grid = (dem_trend/gen_trend)|(may_dem/may_out) 
+annual_seasonality = gg_season(elec_demand)+ylab("Peak Daily Demand") 
+trendseason_grid = (may_dem|may_out)/annual_seasonality
 trendseason_grid
 ```
 
@@ -268,30 +271,49 @@ The figure above shows that there is no clear linear trend in the peak demand da
 The figure shows that there is strong weekly seasonality in the peak daily demand data which is consistent across 2021-2023. There does not appear to be any weekly seasonality for the energy loss data.
 
 
-
-```{r}
-#Annual Seasonality
-
-gg_season(elec_demand)+ylab("Peak Daily Demand") 
-
-```
-
 The figure above shows a clear annual seasonality pattern for the daily peak demand data. Because we are only using a single year of data for the energy loss, it is not sensible to plot the annual seasonality.
 
 ### 1.8.3 ACF and PACF plots
 (*UNFINISHED*)
 
 ```{r}
-acfd=acf(elec_demand,lag.max=364,plot = F)
-{plot(acfd$acf,type="h",xlab="Lag",ylab="ACF")
-  abline(h=-0.06,col="blue",lty=2)
-  abline(h=0.06,col="blue",lty=2)
-  abline(h=0)}
-pacfd=pacf(elec_demand,lag.max=364,plot = F)
-{plot(pacfd$acf,type="h",xlab="Lag",ylab="PACF")
-  abline(h=-0.06,col="blue",lty=2)
-  abline(h=0.06,col="blue",lty=2)
-  abline(h=0)}
+acfd = acf(elec_demand,lag.max = 365,plot=F)
+plot(acfd$)
+
+dem_acf_norm=autoplot(acf(elec_demand, plot = FALSE)) +
+  labs(title = "Peak Daily Demand - ACF",
+       x = "Lag",
+       y = "ACF") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  theme_minimal()
+
+dem_pacf_norm=autoplot(pacf(elec_demand, plot = FALSE)) +
+  labs(title = "Autocorrelation Function (ACF)",
+       x = "Lag",
+       y = "PACF") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  theme_minimal()
+
+dem_acf_365=autoplot(acf(elec_demand,lag.max = 365, plot = FALSE)) +
+  labs(title = "Autocorrelation Function (ACF)",
+       x = "Lag",
+       y = "ACF") +
+  geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  scale_x_continuous(
+    breaks = c(0, 10, 200,300),  # Custom x-axis breaks
+    labels = c("0", "100","200", "300")  # Custom x-axis labels
+  ) +
+  theme_minimal()
+
+dem_pacf_365=autoplot(pacf(elec_demand,lag.max = 365, plot = FALSE)) +
+  labs(title = "Autocorrelation Function (ACF)",
+       x = "Lag",
+       y = "PACF") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+  theme_minimal()
+
+dem_ac_grid = (dem_acf_norm | dem_pacf_norm)/(dem_acf_365 | dem_pacf_365)
+dem_ac_grid
 ```
 
 The cyclicality in the ACF is representative of the annual seasonality/cyclicality in the peak daily demand data. From the acf plot as well as the supporting time plots we can infer that the seasonal period is roughly m=365. Using Figure X and the figures above we can say that the data is most likely non-stationary.
@@ -380,8 +402,6 @@ For the purpose of the model fitting and the  forecasting, the data will be spli
 ```{r}
 train = elec_demand|>filter(Date<="2023/06/14")
 test = elec_demand|>filter(Date>="2023/06/14")
-
-(esk_acc = accuracy(esk_forecasts$fc,test$peak_demand))
 ```
 
 ##
@@ -419,7 +439,7 @@ forecasts=selected_ar_model|>forecast(h="92 days")
 ar_acc=accuracy(forecasts$.mean,test$peak_demand)
 
 forecasts|>autoplot(train[,-3])
-
+augment(selected_ar_model)|>features(.resid, ljung_box, lag=14, dof =1)
 ```
 
 
@@ -536,26 +556,23 @@ The spikes at the 7 and 14 in the PACF plot (Figure X) suggest that we start wit
 ```{r}
 #SARIMA Models
 
-sarima_models=train[,-3]|>model(
-                                   `SARIMA(4,1,4)(2,1,1)[7]`=ARIMA(peak_demand ~1+pdq(4,1,4)+PDQ(2,1,1,period=7)),
-                                  `SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)`=ARIMA(peak_demand ~1+pdq(4,1,5)+PDQ(2,1,1,period=7)+fourier(period=365,K=7))
-                                  )
-#
-sarima_model_365=train[,-3]|>model(`SARIMA(3,0,3)(0,1,0)[365]`=ARIMA(peak_demand ~1+pdq(3,0,3)+PDQ(0,1,0,period=365)))
+# sarima_models=train[,-3]|>model(
+#                                    `SARIMA(4,1,4)(2,1,1)[7]`=ARIMA(peak_demand ~1+pdq(4,1,4)+PDQ(2,1,1,period=7)),
+#                                   `SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)`=ARIMA(peak_demand ~1+pdq(4,1,5)+PDQ(2,1,1,period=7)+fourier(period=365,K=7))
+#                                   )
+# #
+# sarima_model_365=train[,-3]|>model(`SARIMA(3,0,3)(0,1,0)[365]`=ARIMA(peak_demand ~1+pdq(3,0,3)+PDQ(0,1,0,period=365)))
 ```
 
 
 ```{r}
 # 
 # #Plotting the residuals
+#save(sarima_models,sarima_model_365, file = "sarimas.RData")
+load("sarimas.RData")
 sarima_selected_model=sarima_models |> select(`SARIMA(4,1,4)(2,1,1)[7]`)
 
-# save(sarima_selected_model, file = "sar_fourier.RData")
-# acfd=pacf(residuals(sarima_selected_model),lag.max = 365,plot = F)
-# {plot(acfd$acf,type="h",xlab="Lag",ylab="ACF")
-#   abline(h=-0.06,col="blue",lty=2)
-#   abline(h=0.06,col="blue",lty=2)
-#   abline(h=0)}
+
 
 
 gg_tsdisplay(residuals(sarima_selected_model), plot_type='partial')
@@ -598,7 +615,7 @@ gg_tsdisplay(residuals(sarima_selected_model), plot_type='partial')
 lb_df=augment(sarima_selected_model)|>features(.resid, ljung_box, lag=14, dof =6)
 round(lb_df[,2:3],3)|>kable(col.names = c("LB Statistic","P-value"),caption = "Ljung-Box Test for SARIMA(4,1,4)(2,1,2)[7]+Fourier(365)")
 sar_fc=sarima_selected_model|>forecast(h="92 days")
-sar_fc|>autoplot(elec_demand[,-3])
+sar_fc|>autoplot(train[,-3])
 (sarima_four_acc=accuracy(sar_fc$.mean,test$peak_demand))
 
 sar_fc=sarima_selected_model|>forecast(h="92 days")
@@ -679,14 +696,39 @@ The residuals for the $SARIMA(4,1,4)(2,1,1)[7]+Fourier(p=365,k=5)$ model imply t
 ```
 
 
+## 2.8 Benchmark Model - Seasonal Naive
+
+Models that we build for forecasting should always be compared to a simple benchmark model as we need to be able to justify the additional complexity in a model such as an ARIMA or SARIMA model. The more complex model should significantly outperform and present improvements over the simpler model.
+
+In the context of this problem, a seasonal naive model presents itself as the most appropriate benchmark model for forecasting the series due to the presence of strong seasonality in the data.
+
+```{r}
+SeasonalNaive= train|>model(SNAIVE(peak_demand ~ lag("year")))
+SN_fc=SeasonalNaive|>forecast(h="92 days")
+sn_acc =  accuracy(SN_fc$.mean,test$peak_demand)
+```
+
+## 2.9 Eskom's Forecasts
+
+```{r}
+residuals_ts = data.frame(Date=esk_forecasts$Date,Residuals=esk_forecasts$RSA.Contracted.Forecast-elec_demand$peak_demand)|>as_tsibble(index=Date)
+
+gg_tsdisplay(residuals_ts,plot_type = "partial")
+features(residuals_ts,Residuals, ljung_box,lags=1)
+
+esk_forecasts_last_3 = esk_forecasts|>filter(Date>="2023/06/14")
+esk_acc = accuracy(esk_forecasts_last_3$RSA.Contracted.Forecast,test$peak_demand)
+autoplot(train,peak_demand)+autolayer(esk_forecasts_last_3,RSA.Contracted.Forecast,color="red")
+```
+
+## 2.10 Comparing models and residual analysis
 
 
-## 2.8 Comparing models and residual analysis
 
 In the plots of the residuals for the AR, MA, ARMA and ARIMA models found in sections 2.1-2.4 there is a clear presence of significant autocorrelation at high lags, this indicates that these models have failed to capture all of the information available in the data and that other models which are able to capture this information should be used.This is also reflected by the forecast accuracies of the aforementioned models as they all fail to capture either the weekly or annual or both seasonalities resulting in forecasts that do not align with what we'd expect from the historical data.
 
 ```{r}
-# autoplot(elec_demand,peak_demand)+autolayer(esk_forecasts,fc,color="red")
+
 ```
 
 
