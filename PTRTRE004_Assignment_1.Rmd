@@ -27,7 +27,7 @@ Over the past decade, the demand for electricity in South Africa has only increa
 
 The data which will be analysed and then used to create forecasts is named 'ESK6816.csv' and is provided by Eskom (the suppliers of electricity in South Africa). The dataset contains hourly observations beginning $01/04/2019\quad-\quad00:00$ and ending $31/03/2024\quad-\quad23:00$. The raw data consists of $22$ variables, the names of all the variables can be found in the Appendix($1.1$). For the sake of the analysis and forecasting there are two primary variables of interest, $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$. $RSA.Contracted.Demand$ represents the hourly average demand that Eskom must fulfill. $Total.UCLF.OCLF$ represents the total proportion of Eskom's plant capacity that unavailable due to unplanned outages. Various forecasting techniques will be implemented/employed to determine which provides the most valuable insight as well as effective and accurate predictions of future electricity demand and outages. 
 
-# Questions/Hypotheses *Need fleshing out*
+# Questions/Hypotheses
 Eskom states that there are two peak demand periods within a day, the first is from 6am to 9am and the second is from 5pm to 9pm. The focus in this report will be on the 5pm to 9pm period. During this period of the day is when most households in the country use their appliances such as electric hobs, ovens or kettles for cooking, hair dryers for after bathing, televisions or computers for entertainment and heaters in winter or air conditioning units in summer. At the same time there may also still be some commercial or industrial activities which overlap with this increased household demand. This causes a large spike in the electricity demand, putting a lot of strain on the grid as well as on the ageing infrastructure. Many people will also agree that experiencing load shedding during this period of the day is the most inconvenient and annoying, therefore by focusing on forecasting electricity demand and energy loss due to unplanned outages during this period, strategies may be developed to mitigate load shedding during these hours. This will also lead to reduced operational costs as good planning will lessen the need for emergency power purchases (such as diesel fuel generation), ultimately saving Eskom a lot of money.
 
 It is hypothesized that the seasons of the year as well as the economic activity will have a large impact on the daily peak demand, causing an annual pattern to emerge, with demand peaking in winter and reaching a minimum in summer. A weekly pattern should also be visible as during the work week, Monday to Friday, the demand will go up as businesses and companies are operating at full capacity and on the weekends the capacity is greatly reduced. These predictable patterns should assist with producing robust and accurate forecasts.
@@ -392,12 +392,12 @@ Fitting an AR(p) model to this data is not logical as there is significant autoc
 
 ```{r}
 #In the general context of this problem, fitting an AR(p) does not make any sense as there is seasonality in the data and the PACF tapers off slowly whilst the ACF spikes and decreases, therefore even though there is seasonality, an MA(q) model already makes more sense.
-ar_models=train[,-2]|>model(
+ar_models=train|>model(
 
-  `AR(5)`=ARIMA(diffed ~0+pdq(5,0,0)+PDQ(0,0,0)),
-  `AR(6)`=ARIMA(diffed ~0+pdq(6,0,0)+PDQ(0,0,0)),
- `AR(7)`=ARIMA(diffed ~0+pdq(7,0,0)+PDQ(0,0,0)),
-  `AR(8)`=ARIMA(diffed ~0+pdq(8,0,0)+PDQ(0,0,0))
+  `AR(5)`=ARIMA(peak_demand ~0+pdq(5,1,0)+PDQ(0,0,0)),
+  `AR(6)`=ARIMA(peak_demand ~0+pdq(6,1,0)+PDQ(0,0,0)),
+ `AR(7)`=ARIMA(peak_demand ~0+pdq(7,1,0)+PDQ(0,0,0)),
+  `AR(8)`=ARIMA(peak_demand ~0+pdq(8,1,0)+PDQ(0,0,0))
   )
 aicc_table=ar_models|>
                   glance() |>
@@ -416,36 +416,10 @@ selected_ar_model=ar_models |> select(`AR(8)`)
 gg_tsdisplay(residuals(selected_ar_model),plot_type = "partial")
 #Forecasting
 forecasts=selected_ar_model|>forecast(h="92 days")
-forecasts=unpack_hilo(hilo(forecasts,95),5)
-colnames(forecasts)[5:6]=c("lower","upper")
+ar_acc=accuracy(forecasts$.mean,test$peak_demand)
 
-forecast_cumsum=cumsum(forecasts$.mean)
-lower_ci_cumsum=cumsum(forecasts$lower)
-upper_ci_cumsum=cumsum(forecasts$upper)
+forecasts|>autoplot(train[,-3])
 
-
-final_obs=tail(elec_demand$peak_demand, 1)
-
-
-backtransformed_forecasts=forecast_cumsum+final_obs
-backtransformed_lower_ci=lower_ci_cumsum+final_obs
-backtransformed_upper_ci=upper_ci_cumsum+final_obs
-
-ar_acc=accuracy(backtransformed_forecasts,test$peak_demand)
-#
-ar_backtransformed_forecasts= data.frame(Date=forecasts$Date,
-                                           Forecast=backtransformed_forecasts,
-                                           Lower=backtransformed_lower_ci,
-                                           Upper=backtransformed_upper_ci)|> as_tsibble(index=Date)
-
-ggplot() +
-  geom_line(data=train, aes(x=Date, y=peak_demand), color='black') +
-  geom_line(data=ar_backtransformed_forecasts, aes(x=Date, y=Forecast), color='blue') +
-#  geom_ribbon(data = ar_backtransformed_forecasts, aes(x = Date, ymin = Lower, ymax = Upper), alpha = 0.2)+
-  labs(title="92 Day Forecast for AR(8)",
-       x="Time",
-       y="Peak Demand") +
-  theme_minimal()
 ```
 
 
@@ -454,11 +428,11 @@ ggplot() +
 Much like for the AR models, fitting an MA(q) model to this data is not logical. The reasoning is very similar: there is autocorrelation in the PACF and there is seasonality in the data, which standard MA(q) models fail to capture. Therefore the criterion for selecting the best MA(q) model once again came down to selecting the model that produced the lowest AICc.
 
 ```{r}
-ma_models=train[,-2]|>model(
-  `MA(4)`=ARIMA(diffed ~0+pdq(0,0,4)+PDQ(0,0,0)),
-  `MA(5)`=ARIMA(diffed ~0+pdq(0,0,5)+PDQ(0,0,0)),
-  `MA(6)`=ARIMA(diffed ~0+pdq(0,0,6)+PDQ(0,0,0)),
-  `MA(7)`=ARIMA(diffed ~0+pdq(0,0,7)+PDQ(0,0,0))
+ma_models=train|>model(
+  `MA(4)`=ARIMA(peak_demand ~0+pdq(0,1,4)+PDQ(0,0,0)),
+  `MA(5)`=ARIMA(peak_demand ~0+pdq(0,1,5)+PDQ(0,0,0)),
+  `MA(6)`=ARIMA(peak_demand ~0+pdq(0,1,6)+PDQ(0,0,0)),
+  `MA(7)`=ARIMA(peak_demand ~0+pdq(0,1,7)+PDQ(0,0,0))
   
   )
 
@@ -477,36 +451,10 @@ gg_tsdisplay(residuals(ma_selected_model),plot_type = "partial")
 #
 # #Forecasting
 forecasts=ma_selected_model|>forecast(h="92 days")
-forecasts=unpack_hilo(hilo(forecasts,95),5)
-colnames(forecasts)[5:6]=c("lower","upper")
-#
-#
-forecast_cumsum=cumsum(forecasts$.mean)
-lower_ci_cumsum=cumsum(forecasts$lower)
-upper_ci_cumsum=cumsum(forecasts$upper)
-#
-#
-final_obs=tail(elec_demand$peak_demand, 1)
+ma_acc=accuracy(forecasts$.mean,test$peak_demand)
 
-backtransformed_forecasts=forecast_cumsum+final_obs
-backtransformed_lower_ci=lower_ci_cumsum+final_obs
-backtransformed_upper_ci=upper_ci_cumsum+final_obs
-#
-#
-ma_acc=accuracy(backtransformed_forecasts,test$peak_demand)
-ma_backtransformed_forecasts= data.frame(Date=forecasts$Date,
-                                           Forecast=backtransformed_forecasts,
-                                           Lower=backtransformed_lower_ci,
-                                           Upper=backtransformed_upper_ci)|> as_tsibble(index=Date)
+forecasts|>autoplot(train[,-3])
 
-ggplot() +
-  geom_line(data=train, aes(x=Date, y=peak_demand), color='black') +
-  geom_line(data=ma_backtransformed_forecasts, aes(x=Date, y=Forecast), color='blue') +
- #geom_ribbon(data = ma_backtransformed_forecasts, aes(x = Date, ymin = Lower, ymax = Upper), alpha = 0.2)+
-  labs(title="92 Day Forecast for MA(7)",
-       x="Time",
-       y="Peak Demand") +
-  theme_minimal()
 ```
 
 ## 2.3 ARMA Models
@@ -515,13 +463,13 @@ Fitting an ARMA model to this data is once again, not a logical or wise decision
 
 ```{r}
 #ARMA Models
-arma_models= train[,-2]|>model(
-  `ARMA(4,4)`=ARIMA(diffed ~0+pdq(4,0,4)+PDQ(0,0,0)),
-  `ARMA(4,5)`=ARIMA(diffed ~0+pdq(4,0,5)+PDQ(0,0,0)),
-  `ARMA(5,4)`=ARIMA(diffed ~0+pdq(5,0,4)+PDQ(0,0,0)),
-  `ARMA(5,5)`=ARIMA(diffed ~0+pdq(5,0,5)+PDQ(0,0,0)),
-  `ARMA(5,6)`=ARIMA(diffed ~0+pdq(5,0,6)+PDQ(0,0,0)),
-  `ARMA(5,7)`=ARIMA(diffed ~0+pdq(5,0,7)+PDQ(0,0,0))
+arma_models= train|>model(
+  `ARMA(4,4)`=ARIMA(peak_demand ~0+pdq(4,1,4)+PDQ(0,0,0)),
+  `ARMA(4,5)`=ARIMA(peak_demand ~0+pdq(4,1,5)+PDQ(0,0,0)),
+  `ARMA(5,4)`=ARIMA(peak_demand ~0+pdq(5,1,4)+PDQ(0,0,0)),
+  `ARMA(5,5)`=ARIMA(peak_demand ~0+pdq(5,1,5)+PDQ(0,0,0)),
+  `ARMA(5,6)`=ARIMA(peak_demand ~0+pdq(5,1,6)+PDQ(0,0,0)),
+  `ARMA(5,7)`=ARIMA(peak_demand ~0+pdq(5,1,7)+PDQ(0,0,0))
   
   )
 aicc_table=arma_models|>
@@ -537,33 +485,8 @@ gg_tsdisplay(residuals(arma_selected_model),plot_type = "partial")
  
 #Forecasting
 forecasts=arma_selected_model|>forecast(h="92 days")
-forecasts=unpack_hilo(hilo(forecasts,95),5)
-colnames(forecasts)[5:6]=c("lower","upper")
-
-forecast_cumsum=cumsum(forecasts$.mean)
-lower_ci_cumsum=cumsum(forecasts$lower)
-upper_ci_cumsum=cumsum(forecasts$upper)
-
-final_obs=tail(elec_demand$peak_demand, 1)
-
-backtransformed_forecasts=forecast_cumsum+final_obs
-backtransformed_lower_ci=lower_ci_cumsum+final_obs
-backtransformed_upper_ci=upper_ci_cumsum+final_obs
-
-arma_acc=accuracy(backtransformed_forecasts,test$peak_demand)
-backtransformed_forecasts= data.frame(Date=forecasts$Date,
-                                           Forecast=backtransformed_forecasts,
-                                           Lower=backtransformed_lower_ci,
-                                           Upper=backtransformed_upper_ci)|> as_tsibble(index=Date)
-
-ggplot() +
-  geom_line(data=train, aes(x=Date, y=peak_demand), color='black') +
-  geom_line(data=backtransformed_forecasts, aes(x=Date, y=Forecast), color='blue') +
- # geom_ribbon(data = backtransformed_forecasts, aes(x = Date, ymin = Lower, ymax = Upper), alpha = 0.2)+
-  labs(title="92 Day Forecast for ARMA(5,6)",
-       x="Time",
-       y="Peak Demand") +
-  theme_minimal()
+arma_acc=accuracy(forecasts$.mean,test$peak_demand)
+forecasts|>autoplot(train[,-3])
 ```
 
 
