@@ -43,13 +43,13 @@ library(quantmod)
 
 Within this report are the findings and conclusions made for a project conducted for Eskom, with a strong focus on the forecasting of peak daily electricity demand and total energy lost due to unplanned outages (UCLF+OCLF). Using historical data from April 1, 2019 to September 13, 2023, a multitude of forecasting techniques and models were employed to produce valuable insights into the energy supply issues faced by South Africa. Thorough analysis of these forecasts by Eskom might enable the mitigation of load shedding and unplanned outages which will ultimately result in more stability in the national grid.
 
-# Introduction
+# Section 1 - Introduction
 
 Over the past decade, the demand for electricity in South Africa has only increased which has proven itself to be a tough challenge for Eskom, South Africa's primary supplier of power. Unplanned outages caused by ageing infrastructure and poor management combined with the sharp fluctuations in the demand for electricity result in hindrances in meeting the energy demands of South Africa as well as causing alarming rates of instability in the national power grid. This has led to an increase of the amount of load shedding hours in South Africa, even reaching a new record of consecutive days of load shedding in 2023 which had a detrimental impact on the economy of South Africa and the lives of many people. The aim of this project is to produce robust forecasts for the peak daily electricity demand as well as the proportion of energy lost due to all unplanned outages.The robust forecasting of these metrics is vital to Eskom's success in reducing the frequency of load shedding and improving the stability and reliability of the national grid.
 
 The data which will be analysed and then used to create forecasts is named 'ESK6816.csv' and is provided by Eskom. The dataset contains hourly observations beginning $01/04/2019\quad-\quad00:00$ and ending $31/03/2024\quad-\quad23:00$. For the sake of the analysis and forecasting there are two primary variables of interest, $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$. $RSA.Contracted.Demand$ represents the hourly average demand that Eskom must fulfill. $Total.UCLF.OCLF$ represents the total proportion of Eskom's plant capacity that unavailable due to unplanned outages. 
 
-# Questions/Hypotheses
+# Section 2 - Questions/Hypotheses
 
 Eskom states that there are two peak electricity demand periods within a day: 6am to 9am and 5pm to 9pm, the focus of this report will be on the latter. During this period of the day is when most households in South Africa use appliances such as electric stoves, heaters and entertainment devices; at the same time there may also still be some commercial or industrial activities which overlap with this increased household demand. This spike in electricity demand, puts a lot of strain on the grid and the ageing infrastructure.
 
@@ -227,7 +227,9 @@ esk_data_out=esk_data|>filter(Date.Time>="2022-09-14" & Date.Time<="2023-09-14")
 
 ## 1.6 - Aggregating data
 
-(*UNFINISHED*) In order to convert the hourly demand data into daily data such that the peak daily demand can be forecasted, the hourly data will be aggregated by taking the maximum demand of the 5pm-9pm period each day.
+In order to convert the hourly demand data into daily data such that the peak daily demand can be forecasted, the hourly data is aggregated by taking the maximum demand of the 5pm-9pm period each day.
+
+The hourly energy loss data is converted to daily data by taking the maximum amount of energy that is unavailable in the 5pm-9pm period each day. By aggregating the hourly data to daily data a lot of the detail within the series is maintained which makes it ideal for short-term and medium-term forecasts whilst reducing the noise present in the hourly data.
 
 ```{r}
 #Peak daily demand (Max of the evening period 17:00 - 21:00)
@@ -239,7 +241,8 @@ esk_forecasts=esk_data_dem|>group_by(Date)|>
   select(Date,RSA.Contracted.Forecast)|>ungroup()|>as_tsibble(index = Date)
 
 elec_demand=elec_demand|>select(Date,peak_demand)|>as_tsibble(index=Date)|>na.omit()
-gen_out=esk_data_out|>group_by(Date)|>summarise(unplanned_outages=mean(Total.UCLF.OCLF))|>as_tsibble(index=Date)|>na.omit()
+gen_out=esk_data_out|>group_by(Date)|>summarise(unplanned_outages=max(Total.UCLF.OCLF))|>na.omit()|>as_tsibble(index=Date)
+
 ```
 
 ## 1.7 - Decomposition of data
@@ -291,7 +294,7 @@ There is clear annual seasonality pattern for the daily peak demand data. Becaus
 
 (*UNFINISHED*)
 
-```{r,fig.height=3.5,fig.cap="ACF and PACF plots of Peak Daily Demand Data."}
+```{r,fig.height=3.5,fig.cap="ACF and PACF plots of Peak Daily Demand data."}
 
 dem_acf_norm=autoplot(acf(elec_demand, plot = FALSE)) +
   labs(title = "Peak Daily Demand - ACF",
@@ -341,11 +344,22 @@ Figure X shows significant autocorrelation in the series up to relatively high l
 
 The cyclicality in the ACF is representative of the annual seasonality/cyclicality in the peak daily demand data. From the ACF plot as well as the supporting time plots we can infer that the annual period is roughly 365 days. Using Figure X and the figure above we it is clear due due to the presence of trend and strong seasonality that the Peak Demand data is non-stationary.
 
-```{r}
-#ACF AND PACF for GEN_OUT
+```{r,fig.height=1.75,fig.cap="ACF and PACF plots of Average Total Energy Unavailability data."}
+out_acf_norm=autoplot(acf(gen_out$unplanned_outages, plot = FALSE)) +
+  labs(
+       x = "Lag",
+       y = "ACF") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black")
+
+out_pacf_norm=autoplot(pacf(gen_out$unplanned_outages, plot = FALSE)) +
+  labs(
+       x = "Lag",
+       y = "PACF") +
+    geom_hline(yintercept = 0, linetype = "solid", color = "black") 
+
+out_ac_grid = (out_acf_norm | out_pacf_norm)
+out_ac_grid
 ```
-
-
 
 # Section 2 - Peak Daily Demand Model Fitting
 
@@ -357,7 +371,7 @@ train = elec_demand|>filter(Date<="2023/06/14")
 test = elec_demand|>filter(Date>="2023/06/14")
 ```
 
-## 2.1 Differencing for Non-seasonal Models
+## 2.1 - Differencing for Non-seasonal Models
 
 Figure X shows that the peak daily demand data is clearly non-stationary as the series does not fluctuate around a mean of zero and there is a clear presence of seasonality which is supported by the ACF plot in Figure X. Therefore for the non-seasonal models (AR, MA, ARMA and ARIMA) we can take first differences until the data appears stationary.
 
@@ -382,7 +396,7 @@ As shown in the table above, the p-value of the ADF test is $p=0.01$, this means
 
 
 
-## 2.2 AR/MA/ARMA/ARIMA (Non-seasonal) Models
+## 2.2 - AR/MA/ARMA/ARIMA (Non-seasonal) Models
 
 To begin, simple model autoregressive, moving-average, ARMA and ARIMA models will be developed, these are relatively straight forward to fit however, given the seasonality present in the data as shown in Section 1.8.2, we expect that AR, MA, ARMA and ARIMA models will not fit the data adequately. This is because they do not take the seasonal components of the data into consideration, this will result in poor quality forecasts and residuals which indicate that  there is information in the series which has not been captured by the model. For the sake of comprehensiveness and providing a baseline, non-seasonal models are included in the analysis.
 
@@ -555,7 +569,7 @@ Hence the forecast plots are not closely analyzed as the non-seasonal models are
 
 
 
-## 2.3 Differencing for Seasonal Models
+## 2.3 - Differencing for Seasonal Models
 
 As mentioned in Section 1.9.1, Figure X shows that the peak daily demand data is clearly non-stationary. From the investigation into the seasonality present in the data in Section 1.8.3, it is evident that there is strong weekly seasonality in the data which suggests the use of a model such as a SARIMA which takes into account the seasonal components of a series. Seasonal differencing ($m=7$) was applied.
 
@@ -606,11 +620,11 @@ kable(df,row.names = F,caption = "ADF Test Results")
 The p-value of the ADF test is $p=0.01$, this means that there is sufficient evidence to reject the null hypothesis. Thus we can conclude that the series is stationary.
 
 
-## 2.4 SARIMA (Seasonal-ARIMA) Models
+## 2.4 - SARIMA (Seasonal-ARIMA) Models
 
 Section 2.1 presented the shortcomings of applying non-seasonal models to the series as they failed to provide a good fit to the series and produced inaccurate forecasts. The focus is now on $SARIMA(p,d,q)(P,D,Q)[M]$ seasonal models. By adding seasonal components $(P,D,Q)[M]$ to the already existing $ARIMA(p,d,q)$ model framework, we aim to capture the seasonality present in the data which should enable the development of more robust/accurate forecasts. The orders of $p,d,q,P,D,Q$ were selected using the ACF and PACF plots in Section 2.0.2.
 
-### 2.4.1 SARIMA(4,1,4)(2,1,1)[7]
+### 2.4.1 - SARIMA(4,1,4)(2,1,1)[7]
 
 The spikes at lag 7 and lag 14 in the PACF plot in Figure 8 suggest that if we choose $m=7$ then we start with $P=2$ for the seasonal AR component as the initial candidate model. The ACF plot in Figure 8 suggests $Q=1$ for the seasonal MA component due to the significant spike at lag 7. The significant spikes at lag 4 in the ACF/PACF of Figure 8 suggest that $p=4$ and $q=4$ be used as the non-seasonal AR and MA components.
 
@@ -666,7 +680,7 @@ sarima_norm_acc=accuracy(sar_fc$.mean,test$peak_demand)
 
 Whilst the $SARIMA(4,1,4)(2,1,1)[7]$ model incorporates seasonal differencing as well as autoregressive and moving average components the forecasts suggest that the model is not a good fit. While the model appears to capture the weekly seasonality, it falls short in capturing the annual seasonality that is present in the data, thus the forecasts fail to align with what we'd expect of the forecasted values given the historical data. This suggests the need for an additional component which will model the annual pattern.
 
-### 2.4.2 SARIMA(3,0,3)(0,1,0)[365]
+### 2.4.2 - SARIMA(3,0,3)(0,1,0)[365]
 
 An alternative approach to modelling the series is to fit another SARIMA model but set the seasonal period to $m=365$ in order to try and capture the annual seasonality that the $SARIMA(4,1,4)(2,1,1)[7]$ model failed to capture. It is noted that this will very likely affect the model's ability to capture the weekly seasonality. The choice of the $p$ and $q$ parameters arises from seasonally differencing the data with $m=365$ and then applying a further first difference which produced the ACF/PACF plots shown in the figure below.
 
@@ -710,7 +724,7 @@ round(lb_df[,2:3],3)|>kable(col.names = c("LB Statistic","P-value"),caption = "L
 The significant autocorrelation at lags 2,3,4,7 in the ACF and PACF plots of the residuals suggest that the model is an inadequate fit to the data and that there is information in the series that the model has failed to capture. It is clear that by neglecting the weekly seasonality by choosing $m=365$ the model has failed to capture the weekly seasonality which can be seen by the spikes in autocorrelation in the ACF and PACF at lags that are a multiple of 7.
 
 
-```{r,fig.height=2}
+```{r,fig.height=2,fig.cap="Forecasts for SARIMA(3,0,3)(0,1,0)[365] model."}
 sar_fc=sarima_selected_model|>forecast(h="92 days")
 sar_fc|>autoplot(train)+ggtitle("Forecasts for SARIMA(3,0,3)(0,1,0)[365]")+xlab("Time")+ylab("Peak Demand")
 sarima_365_acc=accuracy(sar_fc$.mean,test$peak_demand)
@@ -718,7 +732,7 @@ sarima_365_acc=accuracy(sar_fc$.mean,test$peak_demand)
 
 The forecasts for this represent the annual pattern in the series fairly well as they don't just fluctuate around a constant mean but seem to follow the patterns seen in the historical data, however, the strong autocorrelation present in the residuals at lag 7 make it clear that this model is not appropriate for the series. So whilst the forecasts appear more promising than the $SARIMA(4,1,4)(2,1,1)[7]$ model, further model fitting and exploration is required to find a model that can account for multiple/complex seasonalities.
 
-### 2.4.3 SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)
+### 2.4.3 - SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)
 
 A possible solution to handling a series with complex/multiple seasonality is fitting a dynamic harmonic regression model with an ARIMA error structure (*REF*).
 Put simply, Fourier terms are added to a SARIMA model to account for some one of more of the seasonalities in the data.Therefore, the $SARIMA(4,1,4)(2,1,2)[7]+Fourier(p=365,k=7)$ model is proposed (where $p$ is the period of the Fourier term and $k$ is the order of fourier terms). This specification uses the Fourier terms to try capture the annual seasonality in the data as the period of the annual seasonality is estimated to be 365 days, $k$ is chosen to be 7 as this allows for a more flexible fit which will help avoid underfitting.
@@ -738,7 +752,7 @@ round(lb_df[,2:3],3)|>kable(col.names = c("LB Statistic","P-value"),caption = "L
 
 The residuals for the $SARIMA(4,1,4)(2,1,1)[7]+Fourier(p=365,k=7)$ model suggest that the model is a good fit to the data as there is no significant autocorrelation shown in the ACF or PACF plots. This is supported by the results of the Ljung-Box test for which the $p-value = 0.119$ which as per the hypotheses stated in Section 2.1 means that there is insignificant evidence to reject $H_0$, therefore, we can conclude there is insignificant autocorrelation in the residuals and that the model is capturing the available information in the series well.
 
-```{r,fig.height=2}
+```{r,fig.height=2,fig.cap="Forecasts for SARIMA(4,1,4)(2,1,1)[7]+Fourier(365) model."}
 sar_fc=sarima_selected_model|>forecast(h="92 days")
 sar_fc|>autoplot(train)+xlab("Time")+ylab("Peak Demand")+ggtitle("Forecasts for SARIMA(4,1,4)(2,1,1)[7]+Fourier(p=365,k=5)")
 sarima_four_acc=accuracy(sar_fc$.mean,test$peak_demand)
@@ -746,13 +760,13 @@ sarima_four_acc=accuracy(sar_fc$.mean,test$peak_demand)
 
 The forecasts support the claim that the model is a good fit to the data as the model appears to capture both the weekly and annual seasonality and produce forecasts similar to what we'd expect given the historical data. The addition of the Fourier term seems to have helped capture the annual seasonal component, allowing the SARIMA component to focus on the weekly seasonality. Although it must be noted that the forecast do appear quite smooth which might indicate that the model is underfitting.
 
-## 2.4 Benchmark Model - Seasonal Naive
+## 2.4 - Benchmark Model - Seasonal Naive
 
 Models that we build for forecasting should always be compared to a simple benchmark model as we need to be able to justify the additional complexity introduced when using a model such as an ARIMA or SARIMA model. The more complex model should significantly outperform and present improvements over the simpler forecasting model/method.
 
 In the context of this problem, the seasonal naive forecasting method presents itself as the most appropriate benchmark method for forecasting the series due to the presence of strong seasonality in the series. 
 
-```{r,fig.height=2}
+```{r,fig.height=2,fig.cap="Forecasts for Seasonal Naive Forecasting Method."}
 SeasonalNaive= train|>model(SNAIVE(peak_demand ~ lag("year")))
 SN_fc=SeasonalNaive|>forecast(h="92 days")
 SN_fc|>autoplot(train)+xlab("Time")+ylab("Peak Demand")+ggtitle("Forecasts for Seasonal Naive Method")
@@ -762,10 +776,41 @@ sn_acc =  accuracy(SN_fc$.mean,test$peak_demand)
 
 The forecasts produced by the Seasonal Naive model appear to be accurate and represent both the weekly and annual seasonalities present in the series. The accuracy of the forecasts will be compared to the other models in Section 2.7 in which the quality of the Seasonal Naive forecasts will then be determined.
 
-## 2.5 ARCH and GARCH models
 
-### 2.5.1 ARCH
-```{r,fig.cap="Time and ACF plots of returns/squared returns."}
+
+## 2.5 - Eskom's Forecasts
+
+The residuals for the forecasts made by Eskom appear to be stationary, however, they show that there is strong autocorrelation at lag 1 which suggests that the model that they fit/method they use to produce the forecasts has failed to capture all of the information available in the data and that observations 1 time period (day in this case) apart are highly correlated. We cannot perform a Ljung-Box test as the model which Eskom used to produce these forecasts is not specified, however, the presence of autocorrelation in the residuals is clear. 
+
+```{r,fig.height=3,fig.cap="Residuals for Eskom's Forecasts."}
+residuals_ts = data.frame(Date=esk_forecasts$Date,Residuals=esk_forecasts$RSA.Contracted.Forecast-elec_demand$peak_demand)|>as_tsibble(index=Date)
+
+gg_tsdisplay(residuals_ts,plot_type = "partial")
+```
+
+The forecasts made by Eskom are in line with what we'd expect from the series.
+
+```{r,fig.height=2,fig.cap="Eskom's Forecasts for Peak Daily Demand."}
+esk_forecasts_last_3 = esk_forecasts|>filter(Date>="2023/06/14")
+esk_acc = accuracy(esk_forecasts_last_3$RSA.Contracted.Forecast,test$peak_demand)
+
+
+autoplot(train,peak_demand)+autolayer(esk_forecasts_last_3,RSA.Contracted.Forecast,color="red")+ggtitle("Forecasts made by Eskom")+xlab("Time")+ylab("Peak Demand")
+```
+
+## 2.6 - ARCH and GARCH models
+
+For the ARCH and GARCH models, the focus is on creating models used in forecasting future volatility based on recent patterns of volatility in the data. Thus the choice was made to only use the final year of observations in order to mitigate noise from previous years and ensure that the volatility patterns are more relevant to the current data.
+
+The log returns of the data are calculated as such:
+
+$$log(Return) = log(\frac{x_t}{x_{t-1}})$$
+
+This transformation makes the series more stationary and scales the series which allows us to better investigate the volatility clustering and the evolution of volatility in the series. This transformation is also what enables the use of the ARCH/GARCH models.
+
+The log returns are then also squared, this further exposes clusters of volatility and ensures that the negative and positive log returns contribute equally to the variance that is being modeled. Squaring the log returns also amplifies the larger shocks in the log returns which allow the GARCH model to identify the periods of high volatility.
+
+```{r,fig.height=3,fig.cap="Time and ACF plots of returns/squared returns."}
 elec_demand_df=as.data.frame(elec_demand[,-c(3,4)])
 elec_demand_df$Date=as.Date(elec_demand_df$Date)
 elec_demand_df=elec_demand_df|>filter(Date>="2023-01-01")
@@ -775,17 +820,17 @@ log_daily_returns = dailyReturn(elec_xts,type="log")
 
 log_returns_plot = log_daily_returns|>autoplot()+ggtitle("Log Daily Returns")
 log_returns_squared_plot = (log_daily_returns^2)|>autoplot()+ggtitle("Squared Log Daily Returns")
-log_returns_acf=autoplot(acf(log_daily_returns, plot = FALSE)) +
-  labs(title = "Log Daily Returns - ACF",
+log_returns_acf=autoplot(acf((log_daily_returns^2), plot = FALSE)) +
+  labs(title = "Squared Log Daily Returns",
        x = "Lag",
        y = "ACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
   theme_minimal()
 
-log_returns_squared_acf=autoplot(acf((log_daily_returns^2), plot = FALSE)) +
-  labs(title = "Squared Log Daily Returns - ACF",
+log_returns_squared_acf=autoplot(pacf((log_daily_returns^2), plot = FALSE)) +
+  labs(title = "Squared Log Daily Returns",
        x = "Lag",
-       y = "ACF") +
+       y = "PACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
   theme_minimal()
 
@@ -795,23 +840,45 @@ rets_grid
 ```
 
 
+### 2.6.1 - ARCH
 
+The $ARCH$ models were fitted with an $ARMA$ mean component giving us $ARCH(q)-ARMA(p,q)$ which were fitted to the returns data. The orders for the $ARMA(p,q)$ component were selected using the ACF of the squared log returns.
+
+For the mean component of the first model $p=1$ and $q=1$ were chosen due to the significant spike in autocorrelation at lag 1. For the variance component $q=1$ was chosen. 
+
+The significant autocorrelation at lag 7 and multiples of 7 is due to the strong weekly seasonality in the series, to try and capture this autocorrelation an $ARCH(1)-ARMA(7,7)$ was fitted. An $ARCH(2)-ARMA(7,7)$ was then also fitted to try and capture the autocorrelation present at higher lags. 
 
 ```{r}
-spec_arch1=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,0)),mean.model=list(armaOrder=c(7,7),include.mean=T))
+spec_arch1=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,0)),mean.model=list(armaOrder=c(1,1),include.mean=T))
 arch1=ugarchfit(spec = spec_arch1, data=log_daily_returns)
 
-spec_arch2=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(2,0)),mean.model=list(armaOrder=c(14,14),include.mean=T))
+spec_arch2=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,0)),mean.model=list(armaOrder=c(7,7),include.mean=T))
 arch2=ugarchfit(spec = spec_arch2, data=log_daily_returns)
 
-par(mfrow=c(2,2))
+spec_arch3=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(2,0)),mean.model=list(armaOrder=c(7,7),include.mean=T))
+arch3=ugarchfit(spec = spec_arch3, data=log_daily_returns)
+
+par(mfrow=c(3,2))
 plot(arch1,which=10)
 plot(arch1,which=1)
 plot(arch2,which=10)
 plot(arch2,which=1)
+plot(arch3,which=10)
+plot(arch3,which=1)
+
 ```
 
-### 2.5.2 GARCH
+The residuals and model fits in the figure above show that the $ARCH(1)-ARMA(1,1)$ severely under fits the series. This results in significant autocorrelation in the standardized residuals at low lags such as lag 3 as well as poor model fit as shown by the bands around the log return series which fail to capture most of the volatility in the series.
+
+The $ARCH(1)-ARMA(7,7)$ model provides and improvement on the first model, with significant autocorrelation in the residuals only being present at higher lags. The model fit also shows improvement as the bands surrounding the series somewhat mimic the volatility in the series.
+
+The model fit provided by the $ARCH(2)-ARMA(7,7)$ appears to best capture the volatility in the series however it is still not perfect and there is still significant autocorrelation present in the residuals which suggests the model is not capturing all available information.
+
+### 2.6.2 - GARCH
+
+Like the $ARCH$ models, the $GARCH$ models were fitted with an $ARMA$ mean component which gives us $GARCH(p,q)-ARMA(p,q)$ models. The $ARCH(1)-ARMA(7,7)$ model and the $ARCH(7)-ARMA(7,7)$ model were then modified to include the past variance component $p$ as they provided an indication of what models are better suited to modelling the series.
+
+Therefore the models fitted were the $GARCH(1,1)-ARMA(7,7)$, $GARCH(2,1)-ARMA(7,7)$ and $GARCH(2,2)-ARMA(7,7)$.
 
 ```{r}
 spec_garch11=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,1)),mean.model=list(armaOrder=c(7,7),include.mean=T))
@@ -820,50 +887,34 @@ garch11=ugarchfit(spec = spec_garch11, data=log_daily_returns)
 spec_garch21=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(2,1)),mean.model=list(armaOrder=c(7,7),include.mean=T))
 garch21=ugarchfit(spec = spec_garch21, data=log_daily_returns)
 
+
+
 spec_garch22=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(2,2)),mean.model=list(armaOrder=c(7,7),include.mean=T))
 garch22=ugarchfit(spec = spec_garch22, data=log_daily_returns)
 
 par(mfrow=c(3,2))
+
 plot(garch11,which=10)
 plot(garch11,which=1)
-
 plot(garch21,which=10)
 plot(garch21,which=1)
-
 plot(garch22,which=10)
 plot(garch22,which=1)
 
 ```
 
+The figure above shows that the inclusion of the past variance component helped with modelling the autocorrelation present in the returns as there is no significant autocorrelation in any of the three models. The model fit for all three models is decent but show that the models do not accurately capture the volatility in the data.
 
-## 2.7 Eskom's Forecasts
+## 2.7 - Comparing Forecasting models/methods
 
-The residuals for the forecasts made by Eskom appear to be stationary, however, they show that there is strong autocorrelation at lag 1 which suggests that the model that they fit/method they use to produce the forecasts has failed to capture all of the information available in the data and that observations 1 time period (day in this case) apart are highly correlated. We cannot perform a Ljung-Box test as the model which Eskom used to produce these forecasts is not specified, however, the presence of autocorrelation in the residuals is clear. 
-
-```{r,fig.height=3}
-residuals_ts = data.frame(Date=esk_forecasts$Date,Residuals=esk_forecasts$RSA.Contracted.Forecast-elec_demand$peak_demand)|>as_tsibble(index=Date)
-
-gg_tsdisplay(residuals_ts,plot_type = "partial")
-```
-
-The forecasts made by Eskom are in line with what we'd expect from the series.
-
-```{r,fig.height=2}
-esk_forecasts_last_3 = esk_forecasts|>filter(Date>="2023/06/14")
-esk_acc = accuracy(esk_forecasts_last_3$RSA.Contracted.Forecast,test$peak_demand)
-
-
-autoplot(train,peak_demand)+autolayer(esk_forecasts_last_3,RSA.Contracted.Forecast,color="red")+ggtitle("Forecasts made by Eskom")+xlab("Time")+ylab("Peak Demand")
-```
-
-## 2.8 Comparing Forecasting models/methods
+### 2.7.1 - Mean Forecasting Models
 
 ```{r}
 accs = as.data.frame(rbind(ar_acc,ma_acc,arma_acc,arima_acc,sarima_norm_acc,sarima_365_acc,sarima_four_acc,sn_acc,esk_acc))
 rownames(accs)=c("AR(8)","MA(7)","ARMA(5,6)","ARIMA(5,1,4)","SARIMA(4,1,4)(2,1,1)[7]","SARIMA(3,0,3)(0,1,0)[365]","SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)","Seasonal Naive","Eskom's Forecasts")
 kable(round(accs,3)[,c(2,3)],caption="Forecasting accuracies of models/methods")
 ```
-The forecasted values for the peak demand of electricity were then used to calculate the accuracy of the forecasts by comparing them to the observed demand values in the test set. The table above shows various accuracy metrics for the forecasts produced using AR, MA, ARMA, ARIMA and SARIMA models as well as the Seasonal Naive forecasting method and the forecasts provided by Eskom.
+The forecasted values for the peak demand of electricity were then used to calculate the accuracy of the forecasts by comparing them to the observed demand values in the test set. The table above shows the RMSE and MAE for the forecasts produced using AR, MA, ARMA, ARIMA and SARIMA models as well as the Seasonal Naive forecasting method and the forecasts provided by Eskom.
 
 The findings in Table X and Section 2.2 allow for the non-seasonal models to be ruled out of contention, due to poor model fit and forecast quality/accuracy.
 
@@ -879,6 +930,43 @@ Eskom's forecasts showed excellent accuracy, however, the presence of significan
 
 To produce robust forecasts, the $SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)$ model should be fine-tuned to improve its forecast accuracy. If it turns out that the seasonal naive method consistently outperforms the optimized $SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)$ model, even after rigorous testing, then the seasonal naive method could be preffered due to its simplicity, interpretability and it's relatively low computational complexity for creating forecasts.
 
+### 2.7.2 - Volatility Forecasting Models
+
+The models fit in Section 2.6 exhibited either significant autocorrelation in the residuals, poor model fit (by failing to accurately capture the volatility) or both. This is likely due to the use of an $ARMA(p,q)$ for the mean component of the ARCH/GARCH models which does not account for the seasonality. Therefore, none of the ARCH/GARCH models fitted are appropriate for the capturing the volatility in the data. I would recommend either seasonally adjusting the data or alternative models for the mean component such as a SARIMA model which explicitly incorporates the seasonality present and thus, is much more likely to provide an appropriate fit to the data.
+
+# Section 3 - Total UCLF+OCLF (Energy unavailability) Model Fitting
+
+## Differencing for Non-seasonal Models
+```{r}
+gen_train = gen_out|>filter(Date<="2023-06-14")
+gen_test = gen_out|>filter(Date>="2023-06-14")
+acf(gen_out$unplanned_outages)
+pacf(gen_out$unplanned_outages)
+```
+
+
+```{r}
+gen_out$diffed=difference((gen_out$unplanned_outages),lag=1,differences=1) 
+gg_tsdisplay(gen_out,diffed, plot_type='partial')
+```
+
+
+```{r}
+filted = gen_out[,-3]|>filter(Date>="2023-08-01")
+auto.arima(gen_out$diffed,seasonal = F)
+arima_models=gen_train|>model(MAIN=ARIMA(unplanned_outages ~1+pdq(1,0,0)+PDQ(0,0,0)))
+arima_selected_model=arima_models |> select("MAIN")
+arima_selected_model|>forecast(h="3 months")|>autoplot(gen_train)
+fcfc=arima_selected_model|>forecast(h="92 days")
+accuracy(fcfc$.mean,gen_test$unplanned_outages)
+# gg_tsdisplay(residuals(arima_selected_model), plot_type='partial')
+```
+
+```{r}
+naurmodel=auto.arima(gen_out[,-3],seasonal = F)
+
+naurmodel|>forecast()|>autoplot()
+```
 
 
 # Conclusion 
