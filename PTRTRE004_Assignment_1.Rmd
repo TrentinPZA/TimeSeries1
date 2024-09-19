@@ -37,6 +37,7 @@ library(knitr)
 library(seasonal)
 library(ggfortify)
 library(quantmod)
+library(distributional)
 ```
 
 # Abstract
@@ -216,13 +217,13 @@ Figure X shows how the demand in 2020 differed from the years 2019 and 2021-2023
 # out_plots
 ```
 
-Much like for the demand data the effect of the Covid pandemic is reflected in the energy loss data. However unlike for demand data, there is no clear annual pattern or predictable trend for energy loss due to unplanned generation outages. This is most likely because it depends on current circumstances such as infrastructure failures, maintenance issues or other events that might affect generation capacity. Thus for forecasting unplanned outages, the data that should be used should be recent.
+Much like for the demand data the effect of the Covid pandemic is reflected in the energy loss data. However unlike for demand data, there is no clear annual pattern or predictable trend for energy loss due to unplanned generation outages. This is most likely because it depends on current circumstances such as infrastructure failures, maintenance issues or other events that might affect generation capacity. Thus for forecasting unplanned outages, the data that should be used should be recent. 
 
-Therefore the data is truncated to include only a single year and will run from $2022/09/14$ to $2023/09/13$.
+To ensure that the data is relevant whilst also ensuring that the forecasting models will be able to capture the underlying patterns in the data, the data is truncated to include only the past 2 years and will run from $2021/09/14$ to $2023/09/13$.
 
 ```{r}
 esk_data_dem=esk_data|>filter(Date.Time>="2020-09-14" & Date.Time<="2023-09-14")
-esk_data_out=esk_data|>filter(Date.Time>="2022-09-14" & Date.Time<="2023-09-14")
+esk_data_out=esk_data|>filter(Date.Time>="2021-09-14" & Date.Time<="2023-09-14")
 ```
 
 ## 1.6 - Aggregating data
@@ -254,7 +255,7 @@ dem_trend=elec_demand |>model(STL(peak_demand~trend()))|>
   components() |>
   autoplot(trend)+ggtitle("Trend for Peak Demand")
 
-gen_trend=gen_out |>model(STL(unplanned_outages~trend()))|>
+gen_trend=gen_out |>model(STL(unplanned_outages~trend(window=91)))|>
   components() |>
   autoplot(trend)+ggtitle("Trend for UCLF+OCLF")
 
@@ -375,7 +376,7 @@ test = elec_demand|>filter(Date>="2023/06/14")
 
 Figure X shows that the peak daily demand data is clearly non-stationary as the series does not fluctuate around a mean of zero and there is a clear presence of seasonality which is supported by the ACF plot in Figure X. Therefore for the non-seasonal models (AR, MA, ARMA and ARIMA) we can take first differences until the data appears stationary.
 
-```{r,fig.height=2.5,fig.cap="Differenced data and ACF/PACF plots (Non-seasonal)."}
+```{r,fig.height=2.5,fig.cap="Differenced demand data and ACF/PACF plots (Non-seasonal)."}
 #Taking differences
 elec_demand$diffed=difference((elec_demand$peak_demand),lag=1,differences=1) 
 gg_tsdisplay(elec_demand,diffed, plot_type='partial')
@@ -573,7 +574,7 @@ Hence the forecast plots are not closely analyzed as the non-seasonal models are
 
 As mentioned in Section 1.9.1, Figure X shows that the peak daily demand data is clearly non-stationary. From the investigation into the seasonality present in the data in Section 1.8.3, it is evident that there is strong weekly seasonality in the data which suggests the use of a model such as a SARIMA which takes into account the seasonal components of a series. Seasonal differencing ($m=7$) was applied.
 
-```{r,fig.height=1.5,fig.cap="Differenced data (Seasonal)"}
+```{r,fig.height=1.5,fig.cap="Differenced demand data and ACF/PACF (Seasonal)"}
 elec_demand$seas_diffed=difference(elec_demand$peak_demand,lag=7,differences=1)
 seas_diffed_plot=autoplot(elec_demand,seas_diffed)+xlab("Time")+ylab("SeasDiff(Peak Demand)")
 elec_demand$seas_diffed=difference(elec_demand$seas_diffed,lag=1,differences=1)
@@ -940,32 +941,62 @@ The models fit in Section 2.6 exhibited either significant autocorrelation in th
 ```{r}
 gen_train = gen_out|>filter(Date<="2023-06-14")
 gen_test = gen_out|>filter(Date>="2023-06-14")
-acf(gen_out$unplanned_outages)
-pacf(gen_out$unplanned_outages)
+```
+
+```{r,fig.cap="Differenced energy unavailability data and ACF/PACF plots (Non-seasonal)."}
+kpss.test(gen_out$unplanned_outages,null = "Trend",lshort = F)
+
+stl_components=gen_train |>model(STL(unplanned_outages~trend(window=30)))|>components()
+gen_detrended=stl_components|>mutate(detrended = unplanned_outages - trend)
+
+gen_detrended=gen_detrended[,-c(1,3,4,5,6,7)]
+gen_detrended|>autoplot()
+colnames(gen_detrended)=c("Date","unplanned_outages")
+acf(gen_detrended$unplanned_outages)
+pacf(gen_detrended$unplanned_outages)
+gg_tsdisplay(gen_detrended,unplanned_outages, plot_type='partial')
+
+# gen_out$diffed=difference((gen_out$unplanned_outages),lag=1,differences=1) 
+# gg_tsdisplay(gen_out,diffed, plot_type='partial')
 ```
 
 
 ```{r}
-gen_out$diffed=difference((gen_out$unplanned_outages),lag=1,differences=1) 
-gg_tsdisplay(gen_out,diffed, plot_type='partial')
-```
+arima_models=gen_train|>model(`AR(1)`=ARIMA(unplanned_outages ~1+pdq(3,0,0)+PDQ(0,0,0)),
+                              `ARIMA(1,1,1)`=ARIMA(unplanned_outages ~1+pdq(3,1,4)+PDQ(0,0,0)))
 
-
-```{r}
-filted = gen_out[,-3]|>filter(Date>="2023-08-01")
-auto.arima(gen_out$diffed,seasonal = F)
-arima_models=gen_train|>model(MAIN=ARIMA(unplanned_outages ~1+pdq(1,0,0)+PDQ(0,0,0)))
-arima_selected_model=arima_models |> select("MAIN")
+arima_selected_model=arima_models |> select(`AR(1)`)
+arima_selected_model=arima_models |> select(`ARIMA(1,1,1)`)
 arima_selected_model|>forecast(h="3 months")|>autoplot(gen_train)
 fcfc=arima_selected_model|>forecast(h="92 days")
 accuracy(fcfc$.mean,gen_test$unplanned_outages)
-# gg_tsdisplay(residuals(arima_selected_model), plot_type='partial')
+
+fcfc=arima_selected_model|>forecast(h="92 days")
+gg_tsdisplay(residuals(arima_selected_model), plot_type='partial')
 ```
 
 ```{r}
-naurmodel=auto.arima(gen_out[,-3],seasonal = F)
+trend_model = stl_components|>select(Date,trend)|>model(TSLM(trend ~ trend()))
+trend_forecast = trend_model|>forecast(h = 92)
+```
 
-naurmodel|>forecast()|>autoplot()
+```{r}
+fcfc$forecast= fcfc$.mean + trend_forecast$.mean
+fcfc= unpack_hilo(hilo(fcfc, 95))
+
+
+fcfc$lower= as.numeric(fcfc$`95%`$lower) + as.numeric(trend_forecast$.mean)
+fcfc$upper= as.numeric(fcfc$`95%`$upper) + as.numeric(trend_forecast$.mean)
+
+ggplot(fcfc) +
+  geom_line(aes(x = Date, y = forecast), color = "red") +
+  geom_ribbon(aes(x = Date, ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
+  geom_line(data = gen_train, aes(x = Date, y = unplanned_outages), color = "black") +
+  labs(title = "Forecast with Prediction Intervals", x = "Date", y = "Value") +
+  theme_minimal()
+
+
+accuracy(fcfc$forecast,gen_test$unplanned_outages)
 ```
 
 
