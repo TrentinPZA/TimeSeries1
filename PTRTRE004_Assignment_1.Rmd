@@ -5,6 +5,7 @@ output:
 classoption: notitlepage
 header-includes:
   - "\\usepackage{graphicx}"
+  - "\\usepackage{xcolor}"
 ---
 
 \begin{titlepage}
@@ -23,12 +24,12 @@ header-includes:
 \end{titlepage}
 
 ```{r setup, include=FALSE,warning=F,echo=FALSE}
-knitr::opts_chunk$set(echo=TRUE,warning=F,message=F,echo=F,cache = T)
+knitr::opts_chunk$set(echo=TRUE,warning=F,message=F,echo=F,cache = F)
 library(fable)
 
 # 
 library(fpp3)
-# library(lubridate)
+library(lubridate)
 library(tidyverse)
 library(ggplot2)
 library(forecast)
@@ -37,26 +38,25 @@ library(tseries)
 library(patchwork)
 library(rugarch)
 library(knitr)
-# library(seasonal)
-# library(ggfortify)
+library(seasonal)
+
+library(ggfortify)
 library(quantmod)
 ```
 
 # Abstract
 
-Within this report are the findings and conclusions made for a project conducted for Eskom, with a strong focus on the forecasting of peak daily electricity demand and total energy lost due to unplanned outages (UCLF+OCLF). Using historical data from April 1, 2019 to September 13, 2023, a multitude of forecasting techniques and models were employed to produce valuable insights into the energy supply issues faced by South Africa. Thorough analysis of these forecasts by Eskom might enable the mitigation of load shedding and unplanned outages which will ultimately result in more stability in the national grid.
+Within this report are the findings and conclusions made for a project conducted for Eskom, with a strong focus on the forecasting of peak daily electricity demand and the peak daily total proportion of energy unavailable due to unplanned outages (UCLF+OCLF). Using historical data from April 1, 2019 to September 13, 2023, a multitude of forecasting techniques such as ARIMA,SARIMAand GARCH models were employed to capture the trend, seasonality and volatility in the data. The analysis aims to produce valuable insights into the energy supply issues faced by South Africa. These forecasts could assist Eskom in the mitigating load shedding and unplanned outages which will ultimately result in improved national grid stability/reliability.
 
 # Section 1 - Introduction
 
-Over the past decade, the demand for electricity in South Africa has only increased which has proven itself to be a tough challenge for Eskom, South Africa's primary supplier of power. Unplanned outages caused by ageing infrastructure and poor management combined with the sharp fluctuations in the demand for electricity result in hindrances in meeting the energy demands of South Africa as well as causing alarming rates of instability in the national power grid. This has led to an increase of the amount of load shedding hours in South Africa, even reaching a new record of consecutive days of load shedding in 2023 which had a detrimental impact on the economy of South Africa and the lives of many people. The aim of this project is to produce robust forecasts for the peak daily electricity demand as well as the proportion of energy lost due to all unplanned outages.The robust forecasting of these metrics is vital to Eskom's success in reducing the frequency of load shedding and improving the stability and reliability of the national grid.
+Over the past decade, the demand for electricity in South Africa has only increased which has proven itself to be a tough challenge for Eskom, South Africa's primary supplier of power. Unplanned outages caused by ageing infrastructure and poor management combined with the sharp fluctuations in the demand for electricity result in hindrances in meeting the energy demands of South Africa as well as causing alarming rates of instability in the national power grid. This has led to an increase of the amount of load shedding hours in South Africa, even reaching a new record of consecutive days of load shedding in 2023 which had a detrimental impact on the economy of South Africa and the lives of many people. The aim of this project is to produce robust forecasts for the peak daily electricity demand as well as peak daily total proportion of energy which is unavailable due to all unplanned outages (which will be referred to as Peak Daily UCLF+OCLF).The robust forecasting of these metrics is vital to Eskom's success in reducing the frequency of load shedding and improving the stability and reliability of the national grid.
 
-Eskom states that there are two peak electricity demand periods within a day: 6am to 9am and 5pm to 9pm, the focus of this report will be on the latter. During this period of the day is when most households in South Africa use appliances such as electric stoves, heaters and entertainment devices; at the same time there may also still be some commercial or industrial activities which overlap with this increased household demand. This spike in electricity demand, puts a lot of strain on the grid and the ageing infrastructure.
+Eskom states that there are two peak electricity demand periods within a day: 6am to 9am and 5pm to 9pm [] the focus of this report will be on the latter. During this period of the day is when most households in South Africa use electric appliances; at the same time there may also still be some commercial or industrial activities which overlap with this increased household demand. This spike in electricity demand, puts a lot of strain on the grid and the ageing infrastructure. 
 
-Forecasts will be made using a variety of different time series models. To capture trends and/or seasonal patterns to make point forecasts, AR/MA/ARMA/ARIMA and SARIMA models will be fit to the series. ARCH/GARCH models will be used to model and forecast the volatility in the series of the peak daily demand and energy unavailability.
+Forecasts will be made using a variety of different time series models. To capture trends and/or seasonal patterns to obtain point forecasts as well as prediction intervals, AR/MA/ARMA/ARIMA and SARIMA models will be fit to the series. ARCH/GARCH models will be used to model and forecast the volatility in the series of the peak daily demand and Peak Daily UCLF+OCLF.The forecasts produced will be a blend of short-term and medium-term forecasts which will contribute to operational decisions, grid management and resource allocation for maintanence and power generation.
 
-The forecasts produced will be a blend of short-term and medium-term forecasts which will be used to support operational decisions, grid management and resource allocation for maintanence and power generation.
-
-The data which will be analysed and then used to create forecasts is named 'ESK6816.csv' and is provided by Eskom. The dataset contains hourly observations beginning $01/04/2019\quad-\quad00:00$ and ending $31/03/2024\quad-\quad23:00$. For the sake of the analysis and forecasting there are two primary variables of interest, $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$. $RSA.Contracted.Demand$ represents the hourly average demand that Eskom must fulfill. $Total.UCLF.OCLF$ represents the total proportion of Eskom's plant capacity that unavailable due to unplanned outages. 
+The data used in the analysis is named 'ESK6816.csv' and is sourced from Eskom [4]. The dataset contains hourly observations beginning $01/04/2019\quad-\quad00:00$ and ending $31/03/2024\quad-\quad23:00$. For the purpose of this analysis the two primary variables of interest are $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$. $RSA.Contracted.Demand$ represents the hourly average demand that Eskom must fulfill. $Total.UCLF.OCLF$ represents the total proportion of Eskom's plant capacity that unavailable due to unplanned outages. 
 
 # Section 2 - Questions/Hypotheses
 
@@ -71,10 +71,6 @@ The volatility in the energy unavailability due to unplanned generation outages 
 ## 2.2 - Questions
 How can forecasts be produced that can be used to identify strategies that aim to minimize load shedding as well as energy unavailability during the peak demand period 5pm - 9pm. 
 
-What is the relationship between energy unavailability and load shedding?
-
-How can electricity pricing and contract negotiation be optimized to best mimic the patterns in the peak daily demand which will help reduce operational costs.
-
 Do the residuals of Eskom's forecasts say anything about the model/method that was used to produce the forecasts and how do forecasts align with the observed peak daily demand data?
 
 How is the total energy unavailability due to unplanned generation affected by extreme weather conditions.
@@ -82,9 +78,9 @@ How is the total energy unavailability due to unplanned generation affected by e
 How well do ARCH/GARCH models capture the volatility in the peak daily demand series and the energy unavailability series?
 
 
-# Section 1 - EDA
+# Section 3 - EDA
 
-## 1.1 - Data and variable names/classes
+## 3.1 - Data and variable names/classes
 
 ```{r}
 esk_data=tibble(read.csv("ESK6816.csv"))
@@ -100,18 +96,9 @@ esk_data$Date=as.Date(esk_data$Date)
 
 The data is read in from the ESK6816.csv dataset. The raw data consists of 22 variables and 43848 observations. Of the 22 variables we are only interested in the $Date$, $RSA.Contracted.Demand$, $RSA.Contracted.Forecast$ and $Total.UCLF.OCLF$.
 
-```{r}
-#Appendix
-# variables=matrix(c("Date","Date","RSA.Contracted.Demand","numeric","RSA.Contracted.Forecast","numeric","Total.UCLF.OCLF","numeric"),ncol=2,byrow=T)
-# 
-# colnames(variables)=c("Variable Name","Variable Type")
-# kable(variables,row.names = F,caption="The variables of the ESK6816 dataset and their variable types.")
-```
+The data is filtered to only include the hourly observations from 5pm-9pm, this is a crucial period of the day for electricity demand and unplanned outages. The choice of filtering is applicable to both variables as they have a significant interaction during this period of the day which can have a large impact on the stability of the grid. The table below presents summary statistics of the data for the two variables of interest - $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$.
 
-
-A POSIXct, $Date.Time$, variable is created and then filtered to only include the hourly observations from 5pm-9pm, the peak demand period. The table below presents a some summary statistics of the data for the two variables of interest - $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$.
-
-## 1.2 - Summary statisitcs and Missing Observations
+## 3.2 - Summary statisitcs and missing observations
 
 ```{r}
 dem_5ns=t(as.matrix(summary(esk_data$RSA.Contracted.Demand)))
@@ -122,7 +109,7 @@ rownames(num_sums)=c("Demand","Energy Loss")
 kable(num_sums,caption="Summary statistics - RSA.Contracted.Demand & Total.UCLF.OCLF")
 ```
 
-<!-- These statistics are better contextualized by additionally plotting a histogram for each variable as shown below. For the demand variable we can see that it is slightly skewed to the left and appears to be almost bi-modal with the mean falling in between the two peaks. The plot of the Energy loss is mostly symmetrical, somewhat multimodal and slightly skewed to the right. These features will be investigated further in the time plots of the variables. -->
+
 
 ```{r,fig.height=3.5}
 # hist1=ggplot(esk_data, aes(x = RSA.Contracted.Demand)) +
@@ -144,7 +131,7 @@ kable(num_sums,caption="Summary statistics - RSA.Contracted.Demand & Total.UCLF.
 ```
 
 
-Table X shows that there are 1000 NA observations, on inspection the data shows that from the 14th of September onwards the datasets only contains values for the $Date$ and $RSA.Contracted.Forecast$ variables. The choice was made to truncate the data such that the final observation in the dataset had the Date and time: $2023/09/13 - 21:00$. The dataset contained no other missing data.
+Table 1 shows that there are 1000 NA observations, on inspection the data shows that from the 14th of September onwards the datasets only contains values for the $Date$ and $RSA.Contracted.Forecast$ variables. The choice was made to truncate the data such that the final observation in the dataset had the Date and time: $2023/09/13 - 21:00$. Thereafter the dataset contained no missing data.
 
 ```{r}
 missing_data_inds=(which(is.na(esk_data["RSA.Contracted.Demand"])))
@@ -155,9 +142,9 @@ kable(rbind(df1, df2),caption = "The first and last two observations with missin
 
 ```
 
-## 1.3 - Plotting the raw data
+## 3.3 - Plotting the raw data
 
-We can now plot our data for both the $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$ variables using time plots as shown below. MA-720 (Monthly) smoothing was applied to expose the trend within the raw data.
+The time plots for the $RSA.Contracted.Demand$ and $Total.UCLF.OCLF$ variables are shown below. MA-720 (Monthly) smoothing was applied to expose the trend within the raw data.
 
 ```{r,fig.height=2,fig.width=8,fig.cap="Time plot of the raw demand data.",fig.pos='!h'}
 raw_data=esk_data|>as_tsibble(index=Date.Time)
@@ -184,19 +171,19 @@ out_ma=raw_data|>autoplot(Total.UCLF.OCLF,color="black")+
 dem_ma
 ```
 
-The figure shows that there is some annual seasonality/cyclicality in the demand data. This can be logically explained with the seasons of the year and their correlation with electricity demand. In summer the demand is lower, then it increases until it peaks in mid-winter when the days are shorter and colder, requiring more electricity for lighting and heating. Every year there is also a sharp decline in December/January, we will investigate this further in Section 1.5. The demand time plot also shows the dramatic effect that Covid had on the demand in 2020 making it an outlier amongst the other 4 years (2019,2021,2022,2023).
+The figure shows that there is some annual seasonality/cyclicality in the demand data. This can be logically explained with the seasons of the year and their correlation with electricity demand. In summer the demand is lower, then it increases until it peaks in mid-winter when the days are shorter and colder, requiring more electricity for lighting and heating. Every year there is also a sharp decline in December/January, which is investigated further in [Section 3.4](#examining-major-decreases-in-december)  The demand time plot also shows the dramatic effect that Covid had on the demand in 2020 making it an outlier amongst the other 4 years (2019,2021,2022,2023).
 
-The demand time plot has no clear trend and the variance appears to be fairly constant (although quite high) with the exception of the Covid era and the December/Christmas period.
+The demand time plot has no clear trend and the variance appears to be fairly constant (and quite high) with the exception of the Covid era and the December/Christmas period which both exhibit a spike in variance.
 
 ```{r,fig.height=2,fig.width=8,fig.cap="Time plot of the raw energy loss data.",fig.pos='!h'}
 out_ma
 ```
 
-The time plot for the total energy lost due to unplanned outages presents quite a clear positive linear trend but lacks any noticeable seasonality. The variance also appears to be constant for the majority of the time. We notice that there doesn't seem to be much correlation between the demand and the energy lost due to unplanned outages with the exception of the Covid era. The increasing energy loss can likely be attributed to the lack of adequate infrastructure maintenance.
+The time plot for the proportion of total energy unavailable due to unplanned outages presents a clear positive linear trend (which can likely be attributed to the ageing infrastructure) but lacks any noticeable seasonality. The variance also appears to be constant for the majority of the time. There doesn't seem to be much correlation between the demand and the energy lost due to unplanned outages with the exception of the Covid era. 
 
-## 1.4 - Examining major decreases in December
+## 3.4 - Examining major decreases in December
 
-It was mentioned in section 1.4 that there appeared to be a drastic decrease in the demand around December/January every year. The time plot in the Appendix shows that the sharp decrease is due to Christmas and New years celebrations/holidays. During these times businesses will often close or scale down as people take/are given leave. 
+It was mentioned in [Section 3.3](#plotting-the-raw-data) that there appeared to be a drastic decrease in the demand around December/January every year. The time plot in the Appendix shows that the sharp decrease is due to Christmas and New years celebrations/holidays. During these times businesses will often close or scale down as people take/are given leave and thus the peak daily demand drastically decreases.
 ```{r,fig.height=2}
 #Appendix
 # raw_data|>filter(Date>="2022-12-19",Date<="2023-01-05")|>autoplot(RSA.Contracted.Demand)+ylab("Peak Demand")+xlab("Time")
@@ -204,7 +191,7 @@ It was mentioned in section 1.4 that there appeared to be a drastic decrease in 
 
 
 
-## 1.5 - Data Cleaning
+## 3.5 - Data Cleaning
 
 ```{r,fig.height=2.5}
 # data_2020=esk_data|>filter(format(Date.Time, "%Y") == 2020)|>as_tsibble(index=Date.Time)
@@ -231,13 +218,13 @@ It was mentioned in section 1.4 that there appeared to be a drastic decrease in 
 # dem_plots
 ```
 
-Figure X shows how the demand in 2020 differed from the years 2019 and 2021-2023. Events such as the Covid pandemic are irregular occurrences and thus it is sensible to truncate the data such as to not include demand data which was greatly affected by the Covid pandemic. By comparing 2020 to 2021, it appears that by July 2020 the seasonal pattern seemed to have stabilized , therefore a choice was to truncate the data such that it begins in September of 2020 which will give us 4 full years of data. Thus observations in the final cleaned demand data will begin $2020/09/14 - 17:00$ and run until $2023/09/13 - 21:00$.
+Figure 1 shows how the demand in 2020 differed from the years 2019 and 2021-2023. Events such as the Covid pandemic are irregular occurrences and thus it is sensible to truncate the data such as to not include demand data which was greatly affected by the Covid pandemic. By comparing 2020 to 2021, it appears that by July 2020 the seasonal pattern seemed to have stabilized , therefore a choice was to truncate the data such that it begins in September of 2020 which will give us 4 full years of data. Thus observations in the final cleaned demand data will begin $2020/09/14 - 17:00$ and run until $2023/09/13 - 21:00$.
 
 ```{r,fig.height=3}
 # out_plots
 ```
 
-Much like for the demand data the effect of the Covid pandemic is reflected in the energy loss data. However unlike for demand data, there is no clear annual pattern or predictable trend for energy loss due to unplanned generation outages. This is most likely because it depends on current circumstances such as infrastructure failures, maintenance issues or other events that might affect generation capacity. Thus for forecasting unplanned outages, the data that should be used should be recent. 
+Much like for the demand data the effect of the Covid pandemic is reflected in the energy unavailability data. However unlike for demand data, there is no clear annual pattern or predictable trend for energy loss due to unplanned generation outages. This is most likely because it has a stronger dependence on current circumstances such as infrastructure failures, maintenance issues or other events that might affect generation capacity. Thus for forecasting the peak daily UCLF+OCLF, the data that should be used should be recent. 
 
 To ensure that the data is relevant whilst also ensuring that the forecasting models will be able to capture the underlying patterns in the data, the data is truncated to include only the past 2 years and will run from $2021/09/14$ to $2023/09/13$.
 
@@ -246,11 +233,11 @@ esk_data_dem=esk_data|>filter(Date.Time>="2020-09-14" & Date.Time<="2023-09-14")
 esk_data_out=esk_data|>filter(Date.Time>="2021-09-14" & Date.Time<="2023-09-14")
 ```
 
-## 1.6 - Aggregating data
+## 3.6 - Aggregating data
 
-In order to convert the hourly demand data into daily data such that the peak daily demand can be forecasted, the hourly data is aggregated by taking the maximum demand of the 5pm-9pm period each day.
+In order to convert the hourly demand data into daily data such that the peak daily demand can be forecasted, the hourly data is aggregated by selecting the maximum demand observed during the 5pm-9pm period each day.
 
-The hourly energy loss data is converted to daily data by taking the maximum amount of energy that is unavailable in the 5pm-9pm period each day. By aggregating the hourly data to daily data a lot of the detail within the series is maintained which makes it ideal for short-term and medium-term forecasts whilst reducing the noise present in the hourly data.
+The hourly energy unavailability data is converted to daily data by selecting the maximum UCLF+OCLF observed during the 5pm-9pm period each day. By aggregating the hourly data to daily data a lot of the detail within the series is maintained which makes it ideal for short-term and medium-term forecasts whilst reducing the noise present in the hourly data. Additionally by choosing to aggregate the UCLF+OCLF data in this way, the forecasts can be analysed together with the peak daily demand data, providing a more comprehensive set of forecasts for Eskom to use.
 
 ```{r}
 #Peak daily demand (Max of the evening period 17:00 - 21:00)
@@ -266,16 +253,16 @@ gen_out=esk_data_out|>group_by(Date)|>summarise(unplanned_outages=max(Total.UCLF
 
 ```
 
-## 1.7 - Decomposition of data
+## 3.7 - Decomposition of transformed data
 
 ```{r,fig.height=3,fig.cap="Time plots of cleaned/transformed data with trend plots"}
 elec_plot=autoplot(elec_demand)+xlab("Time")+ylab("Peak Demand")+ggtitle("Time plot for Peak Demand")
 gen_plot=autoplot(gen_out)+xlab("Time")+ylab("UCLF+OCLF")+ggtitle("Time plot for UCLF+OCLF")
-dem_trend=elec_demand |>model(STL(peak_demand~trend()))|>
+dem_trend=elec_demand |>model(STL(peak_demand~trend(window=500)))|>
   components() |>
   autoplot(trend)+ggtitle("Trend for Peak Demand")
 
-gen_trend=gen_out |>model(STL(unplanned_outages~trend(window=30)))|>
+gen_trend=gen_out |>model(STL(unplanned_outages~trend(window=500)))|>
   components() |>
   autoplot(trend)+ggtitle("Trend for UCLF+OCLF")
 
@@ -283,7 +270,9 @@ time_trend = (elec_plot|dem_trend) / (gen_plot | gen_trend)
 time_trend
 ```
 
-The figure above shows that there is some non-linear trend in the peak demand data  but no clear trend in the data for energy loss due to unplanned outages.
+\newpage
+
+Figure 3 exhibits a non-linear trend in the peak daily demand data, this implies that the peak daily demand for electricity follows a more complex/cyclical pattern which could be influenced by exogenous variables. In contrast the peak daily UCLF+OCLF has a strong positive linear trend, indicating that there is a constant increase in peak daily UCLF+OCLF over time which as mentioned previously is likely due to ageing infrastructure and other factors.
 
 
 
@@ -302,20 +291,29 @@ may_out_data=gen_out |>
   as_tsibble(index=Day, key=Year)
 may_out=autoplot(may_out_data,unplanned_outages)+ylab("UCLF+OCLF")+ggtitle("UCLF+OCLF for May 2022")+xlab("Time")
 
-# annual_seasonality = gg_season(elec_demand)+ylab("Peak Daily Demand") 
-# trendseason_grid = (may_dem|may_out)/annual_seasonality
-# trendseason_grid
+annual_seasonality=elec_demand|>mutate(
+                                  Year = format(Date, "%Y"),  
+                                  MonthDay = format(Date, "%m-%d"))|>
+ggplot(aes(x = MonthDay, y = peak_demand, color = Year, group = Year)) +
+  geom_line() +
+  labs(title = NULL, x = "Month-Day", y = "Peak Demand") +
+  scale_color_manual(values = c("2021" = "blue", "2022" = "red","2023"="green"))+
+  theme(axis.text.x = element_blank(),axis.title.x = element_blank(),      
+  )
+
+trendseason_grid = (may_dem|may_out)/annual_seasonality
+trendseason_grid
 ```
 
 
-The figure shows that there is strong weekly seasonality in the peak daily demand data which is consistent across 2021-2023. There does not appear to be any weekly seasonality for the energy loss data.
+The figure above shows that there is strong weekly seasonality in the peak daily demand data which is consistent across 2021-2023. There does not appear to be any weekly seasonality for the peak daily UCLF+OCLF data.
 
-There is clear annual seasonality pattern for the daily peak demand data. Because we are only using a single year of data for the energy loss, it is not sensible to plot the annual seasonality.
+There is clear annual seasonality pattern for the daily peak demand data. Because only a single year of data is used for the peak daily UCLF+OCLF, it is not sensible to plot the annual seasonality.
 
-```{r,fig.height=3.5,fig.cap="ACF and PACF plots of Peak Daily Demand data."}
+```{r,fig.height=2.5,fig.cap="ACF and PACF plots of Peak Daily Demand data."}
 
 dem_acf_norm=autoplot(acf(elec_demand, plot = FALSE)) +
-  labs(title = "Peak Daily Demand - ACF",
+  labs(title = NULL,
        x = "Lag",
        y = "ACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
@@ -325,7 +323,7 @@ dem_acf_norm=autoplot(acf(elec_demand, plot = FALSE)) +
   ) 
 
 dem_pacf_norm=autoplot(pacf(elec_demand, plot = FALSE)) +
-  labs(title = "Autocorrelation Function (ACF)",
+  labs(title = NULL,
        x = "Lag",
        y = "PACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
@@ -335,7 +333,7 @@ dem_pacf_norm=autoplot(pacf(elec_demand, plot = FALSE)) +
   )
 
 dem_acf_365=autoplot(acf(elec_demand,lag.max = 365, plot = FALSE)) +
-  labs(title = "Autocorrelation Function (ACF)",
+  labs(title = NULL,
        x = "Lag",
        y = "ACF") +
   geom_hline(yintercept = 0, linetype = "solid", color = "black") +
@@ -345,7 +343,7 @@ dem_acf_365=autoplot(acf(elec_demand,lag.max = 365, plot = FALSE)) +
   ) 
 
 dem_pacf_365=autoplot(pacf(elec_demand,lag.max = 365, plot = FALSE)) +
-  labs(title = "Autocorrelation Function (ACF)",
+  labs(title = NULL,
        x = "Lag",
        y = "PACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
@@ -358,19 +356,20 @@ dem_ac_grid = (dem_acf_norm | dem_pacf_norm) / (dem_acf_365|dem_pacf_365)
 dem_ac_grid
 ```
 
-Figure X shows significant autocorrelation in the series up to relatively high lags in both the PACF and ACF. There are clear spikes in autocorrelation every 7 lags in both the ACF and PACF which represent the strong weekly seasonality discussed in Section 1.8.2. The figure also suggests that there is some trend in the data through the decaying pattern of the autocorrelation in the ACF, this happens as if there is trend then observations that are close to each other in time are close in size. 
+\newpage
+Figure 5 shows significant autocorrelation in the series up to relatively high lags in both the PACF and ACF. There are clear spikes in autocorrelation every 7 lags in both the ACF and PACF which represent the strong weekly seasonality identified in Figure 4. Figure 5 also confirms the presence of some trend in the data through the decaying pattern of the autocorrelation in the ACF, this pattern emerges as if there is a trend then observations that are close to each other in time are close in size and are therefore correlated. 
 
-The cyclicality in the ACF is representative of the annual seasonality/cyclicality in the peak daily demand data. From the ACF plot as well as the supporting time plots we can infer that the annual period is roughly 365 days. Using Figure X and the figure above we it is clear due due to the presence of trend and strong seasonality that the Peak Demand data is non-stationary.
+The cyclicality in the ACF is representative of the annual seasonality/cyclicality in the peak daily demand data. From the ACF plot as well as the supporting time plots it can be inferred that the annual period is roughly 365 days. Figures 4 and 5 exhibit the presence of trend and strong seasonality in the peak daily demand series, therefore it is non-stationary.
 
-```{r,fig.height=1.75,fig.cap="ACF and PACF plots of Average Total Energy Unavailability data."}
+```{r,fig.height=1.75,fig.cap="ACF and PACF plots of Peak Daily UCLF+OCLF data."}
 out_acf_norm=autoplot(acf(gen_out$unplanned_outages, plot = FALSE)) +
-  labs(
+  labs(title=NULL,
        x = "Lag",
        y = "ACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black")
 
 out_pacf_norm=autoplot(pacf(gen_out$unplanned_outages, plot = FALSE)) +
-  labs(
+  labs(title=NULL,
        x = "Lag",
        y = "PACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") 
@@ -380,12 +379,12 @@ out_ac_grid
 ```
 
 
-The slow decay of autocorrelation in the ACF plot in the figure above reflects the presence of a trend in the series. This suggests that the series is non-stationary and that detrending the series will be required to make the data stationary before modelling of the data takes place.
+The slow decay of autocorrelation in the ACF plot in Figure 6 above reflects the presence of a trend in the series. This suggests that the series is non-stationary and that detrending or differencing the series will be required to make the data stationary before modelling of the data takes place.
 
-The large spike in autocorrelation shown in the PACF plot might indicate an AR(1) component. If the spike remains after the data has been detrended then it will be strong evidence that an AR(1) component is required in the model.
+The large spike in autocorrelation shown in the PACF plot might indicate an AR(1) process. If the spike remains after the data has been made stationary then there is strong evidence that an AR(1) component is required in the model.
 
 
-# Section 2 - Peak Daily Demand Model Fitting
+# Section 4 - Peak Daily Demand Model Fitting
 
 For the purpose of the model fitting, forecasting and comparison, the data will be split up into training/test sets. The forecast horizon was set to 92 days (3 months), a decision which was based on the aims of the project which include producing short-term forecasts which will be used in handling load shedding and medium-term forecasts which will be used in grid management decisions. A forecast horizon of 3 months will also show if the models are accurately capturing the annual seasonal pattern in the data. Therefore, the training set will consist of all observations from $2020/09/14$ to $2023/06/13$ and the test set will be made up of the last 3 months from $2023/06/14$ to $2023/09/14$.
 
@@ -397,9 +396,11 @@ test = elec_demand|>filter(Date>="2023/06/14")|>as_tsibble(index=Date)
 
 ```
 
-## 2.1 - Differencing for Non-seasonal Models
+\newpage
 
-Figure X shows that the peak daily demand data is clearly non-stationary as the series does not fluctuate around a mean of zero and there is a clear presence of seasonality which is supported by the ACF plot in Figure X. Therefore for the non-seasonal models (AR, MA, ARMA and ARIMA) we can take first differences until the data appears stationary.
+## 4.1 - Differencing for Non-seasonal Models
+
+Figures 3,4 and 5 provide evidence that the peak daily demand series is non-stationary as the series does not fluctuate around a mean of zero and there is a clear presence of seasonality. Therefore for the non-seasonal models (AR, MA, ARMA and ARIMA) the series is differenced using first differences until it appears stationary.
 
 ```{r,fig.height=2.5,fig.cap="Differenced demand data and ACF/PACF plots (Non-seasonal)."}
 #Taking differences
@@ -409,38 +410,39 @@ gg_tsdisplay(elec_demand,diffed, plot_type='partial')
 
 The figure above shows data that is representative of stationary series as it fluctuates around a zero-mean and displays no heteroskedasticity.
 
-We can then perform an Augmented Dickey-Fuller test, to test for the presence of a unit root in the series. The null hypothesis of the test is as follows $H_0:$ There is a unit root present in the series, i.e., the series is non-stationary. And the alternative hypothesis is $H_1:$ There is no unit root present in the series, i.e., the series is stationary.
+An Augmented Dickey-Fuller test can be conducted to test for the presence of a unit root in the series. 
+
+\underline{ADF test:}
+
+$H_0:$ There is a unit root present in the series, i.e., the series is non-stationary. 
+
+$H_1:$ There is no unit root present in the series, i.e., the series is stationary.
 
 ```{r}
 adftest=adf.test(na.omit(elec_demand$diffed),alternative="stationary") #p-val=0.01 therefore, reject null that time series is non-stationary
-df = data.frame(Statistic=adftest$statistic,P.Value=adftest$p.value,Alternative=adftest$alternative)
+df = data.frame(Statistic=round(adftest$statistic,3),P.Value=adftest$p.value,Alternative=adftest$alternative)
 kable(df,row.names = F,caption = "ADF Test Results")
 ```
 
-As shown in the table above, the p-value of the ADF test is $p=0.01$, this means that there is sufficient evidence to reject the null hypothesis. Thus we can conclude that the series is stationary.
+As shown in the table above, $p-value=0.01$, this means that there is sufficient evidence that the series is stationary and the null hypothesis is rejected.
+
+\newpage
 
 
+## 4.2 - AR/MA/ARMA/ARIMA (Non-seasonal) Models
 
+To begin, simple model autoregressive, moving-average, ARMA and ARIMA models will be developed, these are relatively straight forward to fit however, given the seasonality present in the data as shown in [Section 3.7](#decomposition-of-transformed-data), it is expected that the non-seasonal AR, MA, ARMA and ARIMA models will not fit the data adequately as they do not take the seasonal components of the data into consideration. For the sake of comprehensiveness and providing a baseline for forecasting models, non-seasonal models are included in the analysis.
 
-## 2.2 - AR/MA/ARMA/ARIMA (Non-seasonal) Models
-
-To begin, simple model autoregressive, moving-average, ARMA and ARIMA models will be developed, these are relatively straight forward to fit however, given the seasonality present in the data as shown in Section 1.8.2, we expect that AR, MA, ARMA and ARIMA models will not fit the data adequately. This is because they do not take the seasonal components of the data into consideration, this will result in poor quality forecasts and residuals which indicate that  there is information in the series which has not been captured by the model. For the sake of comprehensiveness and providing a baseline, non-seasonal models are included in the analysis.
-
-Because of the theoretical limitations of the non-seasonal models, the model fitting and selection process was drastically simplified, leaving the focus on the seasonal models/methods. The non-seasonal models were fit using the same simple methodology:
+Because of the theoretical limitations of the non-seasonal models, the model fitting and selection process was drastically simplified, putting the focus on the seasonal models/methods in [Section 4.4](#sarima-seasonal-arima-models). The non-seasonal models were fit using the same simple methodology:
 
 \begin{enumerate}
-\item Inspect the ACF and PACF plots of the stationarized data in Section 1.9.1.
+\item Inspect the ACF and PACF plots of the stationarized data in Section 4.1.
 \item Determine the relevant orders for $p,d$ and $q$ for a candidate model.
 \item Fit multiple models by varying the relevant orders such as $p=5,6,7,8$ for an $AR(p)$ model.
-\item Choose the best model by comparing AICc values. (Appendix)
+\item Choose the best model by comparing AICc values. (Appendix 1.2)
 \end{enumerate}
 
-
-
-
 ```{r}
-#In the general context of this problem, fitting an AR(p) does not make any sense as there is seasonality in the data and the PACF tapers off slowly whilst the ACF spikes and decreases, therefore even though there is seasonality, an MA(q) model already makes more sense.
-library(fable)
 ar_models=train|>model(
 
   `AR(5)`=ARIMA(peak_demand ~0+pdq(5,1,0)+PDQ(0,0,0)),
@@ -459,7 +461,7 @@ ar_aic_tbl=kable(aicc_table,col.names = c("Model","AICc"),caption="AICc for diff
 
 ```{r}
 selected_ar_model=ar_models |> select(`AR(8)`)
-#gg_tsdisplay(residuals(selected_ar_model),plot_type = "partial")
+
 #Forecasting
 ar_forecasts=selected_ar_model|>forecast(h="92 days")
 ar_acc=accuracy(ar_forecasts$.mean,test$peak_demand)
@@ -486,7 +488,7 @@ ma_aic_tbl=kable(aicc_table,col.names = c("Model","AICc"),caption="AICc for diff
 
 ```{r}
 ma_selected_model=ma_models |> select(`MA(7)`)
-#gg_tsdisplay(residuals(ma_selected_model),plot_type = "partial")
+
 
 #
 # #Forecasting
@@ -517,7 +519,7 @@ arma_aic_tbl=kable(aicc_table,col.names = c("Model","AICc"),caption="AICc for di
 
 ```{r}
 arma_selected_model=arma_models |> select(`ARMA(5,6)`)
-#gg_tsdisplay(residuals(arma_selected_model),plot_type = "partial")
+
  
 #Forecasting
 arma_forecasts=arma_selected_model|>forecast(h="92 days")
@@ -551,7 +553,6 @@ arima_selected_model=arima_models |> select(`ARIMA(5,1,4)`)
 
 ```{r}
 
-# gg_tsdisplay(residuals(arima_selected_model),plot_type = "partial")
 
 # #Forecasting
  arima_fc=arima_selected_model|>forecast(h="92 days")
@@ -568,12 +569,11 @@ rownames(model_specs_df)=NULL
 kable(model_specs_df,caption = "Best model specifications chosen using AICc.")
 ```
 
-
-A residual analysis was conducted on the models listed above. This was comprised of interpreting the plots of the residuals (Appendix) and the results of the Ljung-Box test for autocorrelation of the residuals.
+A residual analysis was conducted on the models listed above. This was comprised of interpreting the plots of the residuals (Appendix 1.3) and the results of the Ljung-Box test for autocorrelation of the residuals.
 
 The hypotheses for the Ljung-Box test are as follows:
 
-$H_0:$ There is no autocorrelation in the residuals for a fixed number of lags (*REF*).
+$H_0:$ There is no autocorrelation in the residuals for a fixed number of lags[3].
 
 $H_1:$ There is autocorrelation present in the residuals at some lag/s $l$ in the residuals. 
 
@@ -585,26 +585,22 @@ lb_test_df$`First Significant AC at Lag` = c("7","6","2","5")
 kable(lb_test_df,caption="Ljung-Box Test Results")
 ```
 
-The Ljung-Box test results above and the plots in the Appendix confirm the expectation that AR, MA, ARMA and ARIMA models will not be appropriate for modelling the given series as all models display significant autocorrelation in the residuals which indicates that there is information that the models are failing to capture. All of the non-seasonal models showed significant autocorrelation at lag 7 which indicates that the strong weekly seasonality was not captured by the models and was still present in the series.
-Hence the forecast plots are not closely analyzed as the non-seasonal models are inadequate for modelling this series, however, the plots can be found in the Appendix.
-
-```{r,fig.height=6,fig.width=10}
-#Appendix
-# fc_grid = (ar_fc_plot | ma_fc_plot) / (arma_fc_plot | arima_fc_plot)
-# fc_grid 
-```
+The Ljung-Box test results above and the residual plots in Appendix 1.3 confirm the expectation that AR, MA, ARMA and ARIMA models will not be appropriate for modelling the given series as all models display significant autocorrelation in the residuals which indicates that there is information that the models are failing to capture. All of the non-seasonal models showed significant autocorrelation at lag 7 which indicates that the strong weekly seasonality was not captured by the models and was still present in the series.
+Hence the forecast plots are not closely analyzed as the non-seasonal models are inadequate for modelling this series, however, the plots can be found in Appendix 1.4.
 
 
 
-## 2.3 - Differencing for Seasonal Models
+\newpage
 
-As mentioned in Section 1.9.1, Figure X shows that the peak daily demand data is clearly non-stationary. From the investigation into the seasonality present in the data in Section 1.8.3, it is evident that there is strong weekly seasonality in the data which suggests the use of a model such as a SARIMA which takes into account the seasonal components of a series. Seasonal differencing ($m=7$) was applied.
+## 4.3 - Differencing for Seasonal Models
 
-```{r,fig.height=1.5,fig.cap="Differenced demand data and ACF/PACF (Seasonal)"}
+As mentioned in [Section 4.1](#differencing-for-non-seasonal-models) the peak daily demand data is clearly non-stationary as there is strong weekly seasonality in the series. This prompts the use of a model such as a SARIMA which takes into account the seasonal components of a series. Seasonal differencing ($m=7$) was applied to try and make the data stationary.
+
+```{r,fig.height=1.25,fig.cap="Differenced demand data and ACF/PACF (Seasonal)"}
 elec_demand$seas_diffed=difference(elec_demand$peak_demand,lag=7,differences=1)
-seas_diffed_plot=autoplot(elec_demand,seas_diffed)+xlab("Time")+ylab("SeasDiff(Peak Demand)")
+seas_diffed_plot=autoplot(elec_demand,seas_diffed)+xlab("Time")+ylab("SDiff(Peak Dem)")
 elec_demand$seas_diffed=difference(elec_demand$seas_diffed,lag=1,differences=1)
-diff_seas_diffed_plot=autoplot(elec_demand,seas_diffed)+xlab("Time")+ylab("Diff(SeasDiff(Peak Demand))")
+diff_seas_diffed_plot=autoplot(elec_demand,seas_diffed)+xlab("Time")+ylab("Diff(SDiff(Peak Dem))")
 
 diff_plot = seas_diffed_plot | diff_seas_diffed_plot
 diff_plot
@@ -614,7 +610,7 @@ The plot below shows that the data still somewhat exhibits the annual seasonal p
 
 ```{r,fig.height=1.5,fig.cap="ACF/PACF of seasonal and first Differenced data."}
 seas_acf=autoplot(acf(na.omit(elec_demand$seas_diffed), plot = FALSE)) +
-  labs(
+  labs(title=NULL,
        x = "Lag",
        y = "acf") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
@@ -624,7 +620,7 @@ seas_acf=autoplot(acf(na.omit(elec_demand$seas_diffed), plot = FALSE)) +
   )
 
 seas_pacf=autoplot(pacf(na.omit(elec_demand$seas_diffed), plot = FALSE)) +
-  labs(
+  labs(title=NULL,
        x = "Lag",
        y = "pacf") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black") +
@@ -636,31 +632,30 @@ seas_acf_pacf_grid=seas_acf | seas_pacf
 seas_acf_pacf_grid
 ```
 
-Once again an ADF test can be performed to determine if the differenced series has reached stationarity. $H_0:$ There is a unit root present in the series, i.e., the series is non-stationary. $H_1:$ There is no unit root present in the series, i.e., the series is stationary.
+Once again an ADF test (as per [Section 4.1](#differencing-for-non-seasonal-models)) can be performed to determine if the differenced series has reached stationarity.
 
 ```{r}
 adftest=adf.test(na.omit(elec_demand$seas_diffed),alternative="stationary") #p-val=0.01 therefore, reject null that time series is non-stationary
-df = data.frame(Statistic=adftest$statistic,P.Value=adftest$p.value,Alternative=adftest$alternative)
+df = data.frame(Statistic=round(adftest$statistic,3),P.Value=adftest$p.value,Alternative=adftest$alternative)
 kable(df,row.names = F,caption = "ADF Test Results")
 ```
 
-The p-value of the ADF test is $p=0.01$, this means that there is sufficient evidence to reject the null hypothesis. Thus we can conclude that the series is stationary.
+The p-value of the ADF test is $p=0.01$, this means that there is sufficient evidence that the series is stationary and the null hypothesis is rejected.
 
+## 4.4 - SARIMA (Seasonal-ARIMA) Models
 
-## 2.4 - SARIMA (Seasonal-ARIMA) Models
+Section 4.2 presented the shortcomings of applying non-seasonal models to the series as they failed to provide a good fit to the series and produced inaccurate forecasts. The focus is now on $SARIMA(p,d,q)(P,D,Q)[M]$ seasonal models. By adding seasonal components $(P,D,Q)[M]$ to the already existing $ARIMA(p,d,q)$ model framework, the aim is to capture the seasonality present in the data which should enable the development of more robust/accurate forecasts. The orders of $p,d,q,P,D,Q$ were selected using the ACF and PACF plots in Section 4.3.
 
-Section 2.1 presented the shortcomings of applying non-seasonal models to the series as they failed to provide a good fit to the series and produced inaccurate forecasts. The focus is now on $SARIMA(p,d,q)(P,D,Q)[M]$ seasonal models. By adding seasonal components $(P,D,Q)[M]$ to the already existing $ARIMA(p,d,q)$ model framework, we aim to capture the seasonality present in the data which should enable the development of more robust/accurate forecasts. The orders of $p,d,q,P,D,Q$ were selected using the ACF and PACF plots in Section 2.0.2.
+### 4.4.1 - SARIMA(4,1,4)(2,1,1)[7]
 
-### 2.4.1 - SARIMA(4,1,4)(2,1,1)[7]
-
-The spikes at lag 7 and lag 14 in the PACF plot in Figure 8 suggest that if we choose $m=7$ then we start with $P=2$ for the seasonal AR component as the initial candidate model. The ACF plot in Figure 8 suggests $Q=1$ for the seasonal MA component due to the significant spike at lag 7. The significant spikes at lag 4 in the ACF/PACF of Figure 8 suggest that $p=4$ and $q=4$ be used as the non-seasonal AR and MA components.
+The spikes at lag 7 and lag 14 in the PACF plot in Figure 9 suggest that if the seasonal period is chosen to be $m=7$ then start with $P=2$ for the seasonal AR component as the initial candidate model. The ACF plot in Figure 9 suggests $Q=1$ for the seasonal MA component due to the significant spike at lag 7. The significant spikes at lag 4 in the ACF/PACF of Figure 9 suggest that $p=4$ and $q=4$ be used as the non-seasonal AR and MA components.
 
 ```{r}
 #SARIMA Models
 
 # sarima_models=train|>model(
 #                                    `SARIMA(4,1,4)(2,1,1)[7]`=ARIMA(peak_demand ~1+pdq(4,1,4)+PDQ(2,1,1,period=7)),
-#                                   `SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)`=ARIMA(peak_demand ~1+pdq(7,1,7)+PDQ(2,1,1,period=7)+fourier(period=365,K=7))
+#                                   `SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)`=ARIMA(peak_demand ~1+pdq(7,1,7)+PDQ(2,1,1,period=7)+fourier(period=365,K=7))
 # )
 # #
 #sarima_model_365=train|>model(`SARIMA(3,0,3)(0,1,0)[365]`=ARIMA(peak_demand ~1+pdq(3,0,3)+PDQ(0,1,0,period=365)))
@@ -673,7 +668,7 @@ load("sarimas.RData")
 ```
 
 
-```{r,fig.height=3,fig.cap="SARIMA(4,1,4)(2,1,1)[7] residual plot."}
+```{r,fig.height=2.75,fig.cap="SARIMA(4,1,4)(2,1,1)[7] residual plot."}
 sarima_selected_model=sarima_models |> select(`SARIMA(4,1,4)(2,1,1)[7]`)
 gg_tsdisplay(residuals(sarima_selected_model), plot_type='partial')
 
@@ -697,17 +692,18 @@ round(lb_df[,2:3],3)|>kable(col.names = c("LB Statistic","P-value"),caption = "L
 
 ```
 
-The residuals of the $SARIMA(4,1,4)(2,1,1)[7]$ model suggest that the model is a good fit to the data as there does not appear to be any significant autocorrelation in the ACF/PACF plots. This is supported by the results of the Ljung-Box test which show $p-value>>0.05$ indicating that we fail to reject $H_0$, therefore we can conclude there is no significant autocorrelation in the residuals.
+The residuals of the $SARIMA(4,1,4)(2,1,1)[7]$ model suggest that the model is a good fit to the data as there does not appear to be any significant autocorrelation in the ACF/PACF plots. This is supported by the results of the Ljung-Box test which show $p-value>>0.05$ indicating that there is sufficient evidence that there is no significant autocorrelation in the residuals and $H_0$ is not rejected.
 
-```{r,fig.height=2,fig.cap="Forecasts for SARIMA(4,1,4)(2,1,1)[7] model."}
+```{r,fig.height=2,fig.cap="Forecasts for SARIMA(4,1,4)(2,1,1)[7] model.",fig.pos="!h"}
 sar_fc=sarima_selected_model|>forecast(h="92 days")
-sar_fc|>autoplot(train)+xlab("Date")+ylab("Peak Demand")+ggtitle("Forecasts for SARIMA(4,1,4)(2,1,1)[7]")+xlab("Time")+ylab("Peak Demand")
+sar_fc|>autoplot(train)+xlab("Date")+ylab("Peak Demand")+xlab("Time")+ylab("Peak Daily Demand")
 sarima_norm_acc=accuracy(sar_fc$.mean,test$peak_demand)
 ```
 
-Whilst the $SARIMA(4,1,4)(2,1,1)[7]$ model incorporates seasonal differencing as well as autoregressive and moving average components the forecasts suggest that the model is not a good fit. While the model appears to capture the weekly seasonality, it falls short in capturing the annual seasonality that is present in the data, thus the forecasts fail to align with what we'd expect of the forecasted values given the historical data. This suggests the need for an additional component which will model the annual pattern.
+\newpage
+Whilst the $SARIMA(4,1,4)(2,1,1)[7]$ model incorporates seasonal differencing as well as autoregressive and moving average components the forecasts suggest that the model is not a good fit. While the model appears to capture the weekly seasonality, it falls short in capturing the annual seasonality that is present in the data, thus the forecasts fail to align with what is expected of the forecasted values given the historical data. This suggests the need for an additional component which will capture the annual seasonal pattern.
 
-### 2.4.2 - SARIMA(3,0,3)(0,1,0)[365]
+### 4.4.2 - SARIMA(3,0,3)(0,1,0)[365]
 
 An alternative approach to modelling the series is to fit another SARIMA model but set the seasonal period to $m=365$ in order to try and capture the annual seasonality that the $SARIMA(4,1,4)(2,1,1)[7]$ model failed to capture. It is noted that this will very likely affect the model's ability to capture the weekly seasonality. The choice of the $p$ and $q$ parameters arises from seasonally differencing the data with $m=365$ and then applying a further first difference which produced the ACF/PACF plots shown in the figure below.
 
@@ -715,13 +711,13 @@ An alternative approach to modelling the series is to fit another SARIMA model b
 elec_demand$seas_diffed=difference(elec_demand$peak_demand,lag=365,differences=1)
 elec_demand$seas_diffed=difference(elec_demand$seas_diffed,lag=1,differences=1)
 acf_365=autoplot(acf(na.omit(elec_demand$seas_diffed), plot = FALSE)) +
-  labs(
+  labs(title=NULL,
        x = "Lag",
        y = "ACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black")
 
 pacf_365=autoplot(pacf(na.omit(elec_demand$seas_diffed), plot = FALSE)) +
-  labs(
+  labs(title=NULL,
        x = "Lag",
        y = "PACF") +
     geom_hline(yintercept = 0, linetype = "solid", color = "black")
@@ -734,7 +730,7 @@ grid_365
 The ACF/PACF plots above suggest the $p=7$ and $q=7$, however, due to the high computational complexity of fitting this model with a $m=365$, $p=3$ and $q=3$ are chosen as the orders for model. The model fit to the series is specified as a $SARIMA(3,0,3)(0,1,0)[365]$.
 
 
-```{r,fig.height=3,fig.cap="SARIMA(3,0,3)(0,1,0)[365] residual plot."}
+```{r,fig.height=2.75,fig.cap="SARIMA(3,0,3)(0,1,0)[365] residual plot."}
 sarima_selected_model=sarima_model_365 |> select(`SARIMA(3,0,3)(0,1,0)[365]`)
 gg_tsdisplay(residuals(sarima_selected_model), plot_type='partial')
 ```
@@ -753,19 +749,20 @@ The significant autocorrelation at lags 2,3,4,7 in the ACF and PACF plots of the
 
 ```{r,fig.height=2,fig.cap="Forecasts for SARIMA(3,0,3)(0,1,0)[365] model."}
 sar_fc=sarima_selected_model|>forecast(h="92 days")
-sar_fc|>autoplot(train)+ggtitle("Forecasts for SARIMA(3,0,3)(0,1,0)[365]")+xlab("Time")+ylab("Peak Demand")
+sar_fc|>autoplot(train)+xlab("Time")+ylab("Peak Daily Demand")
 sarima_365_acc=accuracy(sar_fc$.mean,test$peak_demand)
 ```
 
-The forecasts for this represent the annual pattern in the series fairly well as they don't just fluctuate around a constant mean but seem to follow the patterns seen in the historical data, however, the strong autocorrelation present in the residuals at lag 7 make it clear that this model is not appropriate for the series. So whilst the forecasts appear more promising than the $SARIMA(4,1,4)(2,1,1)[7]$ model, further model fitting and exploration is required to find a model that can account for multiple/complex seasonalities.
+The forecasts for this represent the annual pattern in the series fairly well as they don't just fluctuate around a constant mean but seem to follow the complex patterns seen in the historical data, however, the strong autocorrelation present in the residuals at lag 7 make it clear that this model is not appropriate for the series. So whilst the forecasts appear more promising than the $SARIMA(4,1,4)(2,1,1)[7]$ model, further model fitting and exploration is required to find a model that can account for multiple/complex seasonalities.
 
-### 2.4.3 - SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)
+### 4.4.3 - SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)
 
-A possible solution to handling a series with complex/multiple seasonality is fitting a dynamic harmonic regression model with an ARIMA error structure (*REF*).
-Put simply, Fourier terms are added to a SARIMA model to account for some one of more of the seasonalities in the data.Therefore, the $SARIMA(4,1,4)(2,1,2)[7]+Fourier(p=365,k=7)$ model is proposed (where $p$ is the period of the Fourier term and $k$ is the order of fourier terms). This specification uses the Fourier terms to try capture the annual seasonality in the data as the period of the annual seasonality is estimated to be 365 days, $k$ is chosen to be 7 as this allows for a more flexible fit which will help avoid underfitting.
+A possible solution to handling a series with complex/multiple seasonality is fitting a dynamic harmonic regression model with an ARIMA error structure [4].
+Put simply, Fourier terms are added to a SARIMA model to account for one of more of the seasonalities present in the data. Therefore, the $SARIMA(7,1,7)(2,1,2)[7]+Fourier(p=365,k=7)$ model is proposed (where $p$ is the period of the Fourier term and $k$ is the order of fourier terms). This specification uses the Fourier terms to try capture the annual seasonality in the data as the period of the annual seasonality is estimated to be 365 days, $k$ is chosen to be 7 as this allows for a more flexible fit which will help avoid the model from underfitting. The non-seasonal AR and MA components were also increased to $p=7$ and $q=7$ to try and capture some of the autocorrelation at higher lags.
+\newpage
 
-```{r,fig.height=3,fig.cap="SARIMA(4,1,4)(2,1,1)[7]+Fourier(365) residual plot."}
-sarima_selected_model=sarima_models |> select(`SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)`)
+```{r,fig.height=2.75,fig.cap="SARIMA(7,1,7)(2,1,1)[7]+Fourier(365) residual plot."}
+sarima_selected_model=sarima_models |> select(`SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)`)
 gg_tsdisplay(residuals(sarima_selected_model), plot_type='partial')
 
 ```
@@ -777,55 +774,80 @@ lb_df=augment(sarima_selected_model)|>features(.resid, ljung_box, lag=14, dof =6
 round(lb_df[,2:3],3)|>kable(col.names = c("LB Statistic","P-value"),caption = "Ljung-Box Test Results")
 ```
 
-The residuals for the $SARIMA(4,1,4)(2,1,1)[7]+Fourier(p=365,k=7)$ model suggest that the model is a good fit to the data as there is no significant autocorrelation shown in the ACF or PACF plots. This is supported by the results of the Ljung-Box test for which the $p-value = 0.119$ which as per the hypotheses stated in Section 2.1 means that there is insignificant evidence to reject $H_0$, therefore, we can conclude there is insignificant autocorrelation in the residuals and that the model is capturing the available information in the series well.
+The residuals for the $SARIMA(7,1,7)(2,1,1)[7]+Fourier(p=365,k=7)$ model suggest that the model is a good fit to the data as there is no significant autocorrelation shown in the ACF or PACF plots. This is supported by the results of the Ljung-Box test for which the $p-value = 0.824$ which as per the hypotheses stated in Section 4.2 means that there is insignificant evidence to reject $H_0$, therefore, it can be concluded that there is insignificant autocorrelation in the residuals and that the model is capturing the available information and underlying structures in the series.
 
-```{r,fig.height=2,fig.cap="Forecasts for SARIMA(4,1,4)(2,1,1)[7]+Fourier(365) model."}
+```{r,fig.height=2,fig.cap="Forecasts for SARIMA(7,1,7)(2,1,1)[7]+Fourier(365) model."}
 sar_fc=sarima_selected_model|>forecast(h="92 days")
-sar_fc|>autoplot(train)+xlab("Time")+ylab("Peak Demand")+ggtitle("Forecasts for SARIMA(4,1,4)(2,1,1)[7]+Fourier(p=365,k=5)")
+sar_fc|>autoplot(train)+xlab("Time")+ylab("Peak Daily Demand")
 sarima_four_acc=accuracy(sar_fc$.mean,test$peak_demand)
 ```
 
-The forecasts support the claim that the model is a good fit to the data as the model appears to capture both the weekly and annual seasonality and produce forecasts similar to what we'd expect given the historical data. The addition of the Fourier term seems to have helped capture the annual seasonal component, allowing the SARIMA component to focus on the weekly seasonality. Although it must be noted that the forecast do appear quite smooth which might indicate that the model is underfitting.
+The forecasts support the claim that the model is a good fit to the data as the model appears to capture both the weekly and annual seasonality and produce forecasts similar to what we'd expect given the historical data. The addition of the Fourier term seems to have helped capture the annual seasonal component, allowing the SARIMA component to focus on capturing the weekly seasonality. 
 
-## 2.4 - Benchmark Model - Seasonal Naive
+## 4.5 - Benchmark Model - Seasonal Naive
 
-Models that we build for forecasting should always be compared to a simple benchmark model as we need to be able to justify the additional complexity introduced when using a model such as an ARIMA or SARIMA model. The more complex model should significantly outperform and present improvements over the simpler forecasting model/method.
+Models built for forecasting should always be compared to a simple benchmark model as additional complexity introduced when using a model such as an ARIMA or SARIMA model must be justified [4]. The more complex model should significantly outperform and present improvements over the simpler forecasting model/method.
 
 In the context of this problem, the seasonal naive forecasting method presents itself as the most appropriate benchmark method for forecasting the series due to the presence of strong seasonality in the series. 
 
 ```{r,fig.height=2,fig.cap="Forecasts for Seasonal Naive Forecasting Method."}
 SeasonalNaive= train|>model(SNAIVE(peak_demand ~ lag("year")))
 SN_fc=SeasonalNaive|>forecast(h="92 days")
-SN_fc|>autoplot(train)+xlab("Time")+ylab("Peak Demand")+ggtitle("Forecasts for Seasonal Naive Method")
+SN_fc|>autoplot(train)+xlab("Time")+ylab("Peak Daily Demand")
 benchmark_residuals = SN_fc$.mean - test$peak_demand
 sn_acc =  accuracy(SN_fc$.mean,test$peak_demand)
 ```
 
-The forecasts produced by the Seasonal Naive model appear to be accurate and represent both the weekly and annual seasonalities present in the series. The accuracy of the forecasts will be compared to the other models in Section 2.7 in which the quality of the Seasonal Naive forecasts will then be determined.
+The forecasts produced by the Seasonal Naive model appear to capture both the weekly and annual seasonalities present in the series. The accuracy of the forecasts will be compared to the other models in Section 4.7.
 
 
 
-## 2.5 - Eskom's Forecasts
+## 4.6 - Eskom's Forecasts
 
-The residuals for the forecasts made by Eskom appear to be stationary, however, they show that there is strong autocorrelation at lag 1 which suggests that the model that they fit/method they use to produce the forecasts has failed to capture all of the information available in the data and that observations 1 time period (day in this case) apart are highly correlated. We cannot perform a Ljung-Box test as the model which Eskom used to produce these forecasts is not specified, however, the presence of autocorrelation in the residuals is clear. 
+To determine the quality of the forecasts made by Eskom, a residual analysis is conducted using the residuals calculated by using the forecasts of the Peak Daily Demand provided by Eskom and the observed values of the Peak Daily Demand provided by Eskom.
 
-```{r,fig.height=3,fig.cap="Residuals for Eskom's Forecasts."}
+```{r,fig.height=2.75,fig.cap="Residuals for Eskom's Forecasts."}
 residuals_ts = data.frame(Date=esk_forecasts$Date,Residuals=esk_forecasts$RSA.Contracted.Forecast-elec_demand$peak_demand)|>as_tsibble(index=Date)
 
 gg_tsdisplay(residuals_ts,plot_type = "partial")
 ```
 
-The forecasts made by Eskom are in line with what we'd expect from the series.
+\newpage
+The residuals for the forecasts made by Eskom appear to be stationary, however, they show that there is strong autocorrelation at lag 1 and 2 in the ACF and at lag 1 in the PACF. This suggests that the model/method that Eskom used to produce the forecasts failed to capture all of the information available in the data and that observations 1 time period (day in this case) apart are highly correlated. A Ljung-Box test cannot be performed as the model which Eskom used to produce these forecasts is not specified, however, the presence of autocorrelation in the residuals is clear. 
 
 ```{r,fig.height=2,fig.cap="Eskom's Forecasts for Peak Daily Demand."}
 esk_forecasts_last_3 = esk_forecasts|>filter(Date>="2023/06/14")
 esk_acc = accuracy(esk_forecasts_last_3$RSA.Contracted.Forecast,test$peak_demand)
 
 
-autoplot(train,peak_demand)+autolayer(esk_forecasts_last_3,RSA.Contracted.Forecast,color="red")+ggtitle("Forecasts made by Eskom")+xlab("Time")+ylab("Peak Demand")
+autoplot(train,peak_demand)+autolayer(esk_forecasts_last_3,RSA.Contracted.Forecast,color="blue")+xlab("Time")+ylab("Peak Demand")
 ```
 
-## 2.6 - ARCH and GARCH models
+The forecasts made by Eskom are in line with what we'd expect from the series as they take the shape of the historical weekly and annual seasonality.
+
+
+## 4.7 - Comparison of Mean Forecasting Models/Methods
+
+```{r}
+accs = as.data.frame(rbind(ar_acc,ma_acc,arma_acc,arima_acc,sarima_norm_acc,sarima_365_acc,sarima_four_acc,sn_acc,esk_acc))
+rownames(accs)=c("AR(8)","MA(7)","ARMA(5,6)","ARIMA(5,1,4)","SARIMA(4,1,4)(2,1,1)[7]","SARIMA(3,0,3)(0,1,0)[365]","SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)","Seasonal Naive","Eskom's Forecasts")
+kable(round(accs,3)[,c(2,3)],caption="Forecasting accuracies of models/methods for Peak Electricity Demand")
+```
+The forecasted values for the peak demand of electricity were then used to calculate the accuracy of the forecasts by comparing them to the observed demand values in the test set. The table above shows the RMSE and MAE for the forecasts produced using AR, MA, ARMA, ARIMA and SARIMA models as well as the Seasonal Naive forecasting method and the forecasts provided by Eskom.
+
+The findings in Table 5 and Section 4.2 allow for the non-seasonal models to be ruled out of contention, due to poor model fit, autocorrelated residuals and forecast quality/accuracy.
+
+The $SARIMA(3,0,3)(0,1,0)[365]$ model had the best forecast accuracy on the test set,however, there was significant autocorrelation present in the residuals as found in Section 4.4.2 make it unreliable as there is clearly information that was not captured by the model. The performance on a single test set does not determine that the model generalizes well to all cases.
+
+The most promising model was the $SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)$ model. The residual analysis in Section 4.4.3 suggested that the model was a good fit and the forecasts aligned well with what is expected based on the historical data from the series. The forecast accuracy was also relatively good and could be improved through further tweaking of the model parameters.
+
+The Seasonal Naive forecasting method performed very well on the test set, however, the simplicity of this method could result in poor generalization to other test sets and more rigorous testing such as Cross-Validation would be necessary to determine the general performance of this method.
+
+Eskom's forecasts showed excellent accuracy, however, the presence of significant autocorrelation at lag 1 as discovered in the residual analysis in Section 4.6, suggests that whatever model/method was used to produce these forecasts failed to capture all of the available information. This might prove to be a problem in the long term for providing accurate and robust forecasts.
+
+To produce robust forecasts, the $SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)$ model should be fine-tuned to improve its forecast accuracy. If it turns out that the seasonal naive method consistently outperforms the optimized $SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)$ model, even after rigorous testing, then the seasonal naive method could be preffered due to its simplicity, interpretability and it's relatively low computational complexity for creating forecasts.
+
+## 4.8 - ARCH and GARCH models
 
 For the ARCH and GARCH models, the focus is on creating models used in forecasting future volatility based on recent patterns of volatility in the data. Thus the choice was made to only use the final year of observations in order to mitigate noise from previous years and ensure that the volatility patterns are more relevant to the current data.
 
@@ -835,7 +857,7 @@ $$log(Return) = log(\frac{x_t}{x_{t-1}})$$
 
 This transformation makes the series more stationary and scales the series which allows us to better investigate the volatility clustering and the evolution of volatility in the series. This transformation is also what enables the use of the ARCH/GARCH models.
 
-The returns are then also squared, this further exposes clusters of volatility and ensures that the negative and positive returns contribute equally to the variance that is being modeled. Squaring the returns also amplifies the larger shocks in the returns which allow the GARCH model to identify the periods of high volatility.
+The returns are then also squared, this further exposes clusters of volatility and ensures that the negative and positive returns contribute equally to the variance that is being modeled. Squaring the returns also amplifies the larger shocks in the returns which allow the GARCH model to identify the periods of high volatility.\newpage
 
 ```{r,fig.height=4,fig.cap="Time and ACF plots of returns/squared returns. (Electricity Demand)"}
 elec_demand_df=as.data.frame(elec_demand[,-c(3,4)])
@@ -846,7 +868,7 @@ elec_xts = xts(elec_demand_df$peak_demand,order.by=elec_demand_df$Date)
 log_daily_returns = dailyReturn(elec_xts,type="log")
 
 log_returns_plot = log_daily_returns|>autoplot()+ggtitle("Daily Returns")
-log_returns_squared_plot = (log_daily_returns)|>autoplot()+ggtitle("Squared Daily Returns")
+log_returns_squared_plot = (log_daily_returns)^2|>autoplot()+ggtitle("Squared Daily Returns")
 log_returns_acf=autoplot(acf((log_daily_returns), plot = FALSE)) +
   labs(title = "Daily Returns",
        x = "Lag",
@@ -880,7 +902,7 @@ rets_grid
 ```
 
 
-The figure above shows that the squared daily returns appear to have significant autocorrelation, as shown by the spikes in the ACF/PACF plots at lags which are a multiple of 7, this suggests a $GARCH(p,q)$ model. To confirm the presence of ARCH (AutoRegressive Conditional Heteroskedasticity) effects, a formal test can be conducted.
+The figure above shows that the squared daily returns appear to have significant autocorrelation, as shown by the spikes in the ACF/PACF plots at lags which are a multiple of 7, this suggests a $GARCH(p,q)$ model, however, $ARCH(p)$ models will also be fitted. To confirm the presence of ARCH (AutoRegressive Conditional Heteroskedasticity) effects, a formal test can be conducted.
 
 \underline{ARCH-LM test:}
 
@@ -899,12 +921,12 @@ detach("package:FinTS", unload=TRUE)
 The $p-value<0.001$, therefore there is strong evidence that there are ARCH effects present in the returns series and $H_0$ is rejected. 
 
 
-### 2.6.1 - ARCH
+### 4.8.1 - ARCH
 
-To determine the best $ARCH(p)$ model 3 models were fitted, using the PACF plot of the squared returns to determine the order of $p$. The PACF of the squared returns in Figure X show that there is only significant autocorrelation at lags which are a multiple of 7. A baseline $ARCH(1)$ was fitted alongside two more complex models, the $ARCH(7)$ and $ARCH(14)$ models.
+To determine the best $ARCH(p)$ model 3 models were fitted, using the PACF plot of the squared returns to determine the order of $p$ [5]. The PACF of the squared returns in Figure 20 show that there is only significant autocorrelation at lags which are a multiple of 7. A baseline $ARCH(1)$ was fitted alongside two more complex models, the $ARCH(7)$ and $ARCH(14)$ models.
 
 
-```{r}
+```{r,fig.cap="Standardized Residuals and Superimposed conditional SD for ARCH models.",fig.height=4,fig.width=6}
 spec_arch1=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,0)),mean.model=list(armaOrder=c(0,0),include.mean=F))
 arch1=ugarchfit(spec = spec_arch1, data=log_daily_returns)
 
@@ -914,29 +936,36 @@ arch2=ugarchfit(spec = spec_arch2, data=log_daily_returns)
 spec_arch3=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(14,0)),mean.model=list(armaOrder=c(0,0),include.mean=F))
 arch3=ugarchfit(spec = spec_arch3, data=log_daily_returns)
 
-par(mfrow=c(3,2))
-plot(arch1,which=10)
-plot(arch1,which=1)
-plot(arch2,which=10)
-plot(arch2,which=1)
-plot(arch3,which=10)
-plot(arch3,which=1)
+par(mfrow=c(3,2), mar=c(4, 4, 3, 2))
+{plot(arch1,which=10,title=NULL)
+  mtext("ARCH(1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(arch1,which=1)
+mtext("ARCH(1) Model", side = 3, line = 1.8, outer = FALSE, cex = 0.6) }
+{plot(arch2,which=10)
+  mtext("ARCH(7) Model", side = 3, line = 1.8, outer = FALSE, cex = 0.6) }
+{plot(arch2,which=1)
+  mtext("ARCH(7) Model", side = 3, line = 1.8, outer = FALSE, cex = 0.6) }
+{plot(arch3,which=10)
+    mtext("ARCH(14) Model", side = 3, line = 1.8, outer = FALSE, cex = 0.6) }
+{plot(arch3,which=1)
+    mtext("ARCH(14) Model", side = 3, line = 1.8, outer = FALSE, cex = 0.6) }
 
 ```
 
+\newpage
 The residuals and model fits in the figure above show that the $ARCH(1)$ severely under fits the series. This results in significant autocorrelation in the standardized residuals at lag 1 as well as poor model fit as shown by the bands around the log return series which fail to capture the volatility in the series.
 
 The $ARCH(7)$ and $ARCH(14)$ models provide an improvement on the $ARCH(1)$ model, as shown by the plot of the conditional standard deviation which is superimposed on the returns series. The model appears to capture and mimic the patterns of the volatility in the series. With all this said, the $ARCH(7)$ and $ARCH(14)$ models still exhibit significant autocorrelation in the standardized residuals at low lags, which suggest that the models are not adequately modelling the volatility in the series.
 
-### 2.6.2 - GARCH
+### 4.8.2 - GARCH
 
-The $GARCH$ models were fitted with an $ARMA$ mean component giving us $GARCH(p,q)-ARMA(p,q)$ which were fitted to the returns data. The orders for the $ARMA(p,q)$ component were selected using the ACF and PACF of the returns as shown in Figure X and the orders for the $GARCH(p,q)$ were selected using the ACF/PACF plots of the squared returns.  
+The $GARCH$ models were fitted with an $ARMA$ mean component giving us $GARCH(p,q)-ARMA(p,q)$ which were fitted to the returns data. The orders for the $ARMA(p,q)$ component were selected using the ACF and PACF of the returns [5] as shown in Figure 20 and the orders for the $GARCH(p,q)$ were selected using the ACF/PACF plots of the squared returns.  
 
 The significant autocorrelation at lag 7 and multiples of 7 is due to the strong weekly seasonality in the series, to try and capture this autocorrelation $p=7$ and $q=7$ were chosen for the $ARMA(p,q)$ component for all the models. (Note: Lower orders of $p$ and $q$ were also tested but always resulted in a model which was underfitting.) 
 
-Much like in Section 2.6.1 a baseline $GARCH(1,1)-ARMA(7,7)$ was fitted alongside two other models which better represent the autocorrelation present in the ACF/PACF of the squared returns. The two more complex models were: $GARCH(7,7)-ARMA(7,7)$ and the $GARCH(14,14)-ARMA(7,7)$.
+Much like in Section 4.8.1 a baseline $GARCH(1,1)-ARMA(7,7)$ was fitted alongside two other models which better represent the autocorrelation present in the ACF/PACF of the squared returns. The two more complex models were: $GARCH(7,7)-ARMA(7,7)$ and the $GARCH(14,14)-ARMA(7,7)$.
 
-```{r}
+```{r,fig.cap="Standardized Residuals and Superimposed conditional SD for GARCH models.",fig.height=4,fig.width=6}
 spec_garch11=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(1,1)),mean.model=list(armaOrder=c(7,7),include.mean=F))
 garch11=ugarchfit(spec = spec_garch11, data=log_daily_returns)
 
@@ -946,55 +975,40 @@ garch21=ugarchfit(spec = spec_garch21, data=log_daily_returns)
 spec_garch22=ugarchspec(variance.model=list(model="sGARCH", garchOrder=c(14,14)),mean.model=list(armaOrder=c(7,7),include.mean=F))
 garch22=ugarchfit(spec = spec_garch22, data=log_daily_returns)
 
-par(mfrow=c(3,2))
+par(mfrow=c(3,2), mar=c(4, 4, 3, 2))
 
-plot(garch11,which=10)
-plot(garch11,which=1)
-plot(garch21,which=10)
-plot(garch21,which=1)
-plot(garch22,which=10)
-plot(garch22,which=1)
+{plot(garch11,which=10)
+   mtext("GARCH(1,1)-ARMA(7,7) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(garch11,which=1)
+   mtext("GARCH(1,1)-ARMA(7,7) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(garch21,which=10)
+   mtext("GARCH(7,7)-ARMA(7,7) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(garch21,which=1)
+   mtext("GARCH(7,7)-ARMA(7,7) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(garch22,which=10)
+   mtext("GARCH(14,14)-ARMA(7,7) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(garch22,which=1)
+   mtext("GARCH(14,14)-ARMA(7,7) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
 
 ```
+
+\newpage
 
 The figure above shows that the inclusion of the past variance component helped with modelling the autocorrelation present in the returns as there is no significant autocorrelation in the standardized residuals of any of the three models. The model fit for all three models is decent but show that the models are underfitting the volatility in the series. The more complex $GARCH(7,7)$ and $GARCH(14,14)$ models are not worth the extra complexity as the $GARCH(1,1)$ produces a model fit similar to the $GARCH(14,14)$ model whilst still maintaining the quality of the residuals.
 
-## 2.7 - Comparison of Forecasting models/methods
 
-### 2.7.1 - Mean Forecasting Models/Methods
 
-```{r}
-accs = as.data.frame(rbind(ar_acc,ma_acc,arma_acc,arima_acc,sarima_norm_acc,sarima_365_acc,sarima_four_acc,sn_acc,esk_acc))
-rownames(accs)=c("AR(8)","MA(7)","ARMA(5,6)","ARIMA(5,1,4)","SARIMA(4,1,4)(2,1,1)[7]","SARIMA(3,0,3)(0,1,0)[365]","SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)","Seasonal Naive","Eskom's Forecasts")
-kable(round(accs,3)[,c(2,3)],caption="Forecasting accuracies of models/methods for Peak Electricity Demand")
-```
-The forecasted values for the peak demand of electricity were then used to calculate the accuracy of the forecasts by comparing them to the observed demand values in the test set. The table above shows the RMSE and MAE for the forecasts produced using AR, MA, ARMA, ARIMA and SARIMA models as well as the Seasonal Naive forecasting method and the forecasts provided by Eskom.
+## 4.9 - Comparison of Volatility Forecasting Models
 
-The findings in Table X and Section 2.2 allow for the non-seasonal models to be ruled out of contention, due to poor model fit and forecast quality/accuracy.
+The ARCH models fit in Section 4.8.1 exhibited either significant autocorrelation in the residuals, poor model fit (by failing to accurately capture the volatility) or both. This is likely due to the lack of a mean component to account for the seasonality in the series.Therefore, none of the ARCH models fitted are appropriate for the capturing the volatility in the series. The GARCH models performed better, specifically in producing residuals which indicate good model fit. The most appropriate of the fitted models based on a balance of model fit and model complexity would be the $GARCH(1,1)-ARMA(7,7)$ model.
 
-The residuals for the $SARIMA(4,1,4)(2,1,1)[7]$ showed good model fit based on the residual analysis in Section 2.4.1, however, the forecast accuracy was lacking as the model struggled to capture the annual seasonality.
+I would recommend either seasonally adjusting the data and then implementing the $GARCH(1,1)-ARMA(7,7)$ model or alternatively use a SARIMA model which explicitly incorporates the seasonality present and thus, is much more likely to provide an appropriate fit to the data.\newpage
 
-The $SARIMA(3,0,3)(0,1,0)[365]$ model had the best forecast accuracy on the test set,however, there was significant autocorrelation present in the residuals as found in Section 2.4.2 make it unreliable as there is clearly information that was not captured by the model. The performance on a single test set does not determine that the model generalizes well to all cases.
+# Section 5 - Peak Daily UCLF+OCLF (Energy unavailability) Model Fitting
 
-The most promising model was the $SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)$ model. The residual analysis in Section 2.4.3 suggested that the model was a good fit and the forecasts aligned well with what we'd expect to see based on the historical data from the series. The forecast accuracy was also relatively good and could be improved through further tweaking of the model parameters.
+The analysis in this section follows the same workflow as established in Section  4 which includes similar time series forecasting models and model evaluation techniques. The workflow will be implemented with a focus on forecasting the peak daily UCLF+OCLF due to unplanned generation outages and therefore the necessary adjustments will be made to the methodology based on the differing characteristics of the data as discussed in Section 3.7.
 
-The Seasonal Naive forecasting method performed very well on the test set, however, the simplicity of this method could result in poor generalization to other test sets and more rigorous testing such as Cross-Validation would be necessary to determine the general performance of this method.
-
-Eskom's forecasts showed excellent accuracy, however, the presence of significant autocorrelation at lag 1 as discovered in the residual analysis in 2.7, suggests that whatever model/method was used to produce these forecasts failed to capture all of the available information. This might prove to be a problem in the long term for providing accurate and robust forecasts.
-
-To produce robust forecasts, the $SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)$ model should be fine-tuned to improve its forecast accuracy. If it turns out that the seasonal naive method consistently outperforms the optimized $SARIMA(4,1,4)(2,1,1)[7]+Fourier(365)$ model, even after rigorous testing, then the seasonal naive method could be preffered due to its simplicity, interpretability and it's relatively low computational complexity for creating forecasts.
-
-### 2.7.2 - Volatility Forecasting Models
-
-The ARCH models fit in Section 2.6.1 exhibited either significant autocorrelation in the residuals, poor model fit (by failing to accurately capture the volatility) or both. This is likely due to the lack of a mean component to account for the seasonality in the series.Therefore, none of the ARCH models fitted are appropriate for the capturing the volatility in the series. The GARCH models performed better, specifically in producing residuals which indicate good model fit. The most appropriate of the fitted models based on a balance of model fit and model complexity would be the $GARCH(1,1)-ARMA(7,7)$ model.
-
-I would recommend either seasonally adjusting the data and then implementing the $GARCH(1,1)-ARMA(7,7)$ model or alternatively use a SARIMA model which explicitly incorporates the seasonality present and thus, is much more likely to provide an appropriate fit to the data.
-
-# Section 3 - Total UCLF+OCLF (Energy unavailability) Model Fitting
-
-The analysis in this section follows the same workflow as established in Section 2 which includes similar time series forecasting models and model evaluation techniques. The workflow will be implemented with a focus on forecasting the total energy unavailability due to unplanned generation outages - $Total.UCLF.OCLF$ and therefore the necessary adjustments will be made to the methodology based on the differing characteristics of the data as discussed in Section 1.7.
-
-The same training/test split and forecast horizon will be used as specified in Section 2. This will provide an adequate amount of data to train and test the model on and the 3-month forecast horizon is suitable as it balances forecasting accuracy with the model/s ability to capture recent trends whilst mitigating the effects of noise. This results in robust forecasts which can be used for informing critical decisions regarding resource allocation and maintenance scheduling which are vital in minimizing unplanned outages causing energy unavailability.
+The same training/test split and forecast horizon will be used as specified in Section 4 (test set is the last 3 months of observations). This will provide an adequate amount of data to train and test the model on and the 3-month forecast horizon is suitable as it balances forecasting accuracy with the model/s ability to capture recent trends whilst mitigating the effects of noise. This results in robust forecasts which can be used for informing critical decisions regarding resource allocation and maintenance scheduling which are vital in minimizing unplanned outages causing energy unavailability.
 
 ```{r}
 gen_train = gen_out|>filter(Date<="2023-06-14")
@@ -1002,23 +1016,15 @@ gen_test = gen_out|>filter(Date>="2023-06-14")
 ```
 
 
-Figure X in Section 1.7 shows that there is a strong positive linear trend in the series as well as a lack of any sort of seasonality. Based on time series theory as well as the methodology and findings of Section 2, the use of a seasonal model will not be appropriate due to the lack of seasonality in the series, which is reflective of the use of non-seasonal models for the series in Section 2. Therefore an AR/MA/ARMA or ARIMA model will be fit to the series based on the findings from differencing/detrending the data.
+Figure 3 in Section 3.7 shows that there is a strong positive linear trend in the series as well as a lack of any sort of seasonality. Based on time series theory as well as the methodology and findings of Section 2, the use of a seasonal model will not be appropriate due to the lack of seasonality in the series, which is reflective of the use of non-seasonal models for the series in Section 4. Therefore an AR/MA/ARMA or ARIMA model will be fit to the series based on the findings from differencing/detrending the data.
 
-Figure X shows that the series could possibly be trend stationary as the series appears to fluctuate around a deterministic trend, which can then be made stationary by simply removing the trend component of the series. To test for trend stationarity we can perform a KPSS test as well as an ADF test to assist in confirming any uncertainties.
+Figure 3 shows that the series could possibly be trend stationary as the series appears to fluctuate around a deterministic trend , which can then be made stationary by simply removing the trend component of the series [6]. To test for trend stationarity a KPSS test as well as an ADF test can be performed to assist in confirming any uncertainties.
 
 \underline{KPSS test:}
 
 $H_0:$ The series is trend stationary.
 
 $H_1:$ The series is non-stationary and may have a unit-root.
-
-\underline{ADF test:}
-
-$H_0:$ The series has a unit root (series is non-stationary).
-
-$H_1:$ The series is stationary/trend stationary.
-
-## 3.1 - Detrending the series
 
 ```{r}
 kpss_test_short=kpss.test(gen_out$unplanned_outages,null = "Trend",lshort = T)
@@ -1034,11 +1040,13 @@ results_df = data.frame(`Test Type`=c("KPSS","KPSS","ADF"),
 kable(results_df,caption="Results of the KPSS and ADF tests.")
 ```
 
+## 5.1 - Detrending the series
+
 The KPSS test with the Truncation Lag parameter set to 'short' suggests that the series is not trend stationary ($p-value=0.029$, reject $H_0$), this result conflicts with the other test results. The KPSS test with the Truncation Lag parameter set to 'long' suggests that the series is trend stationary ($p-value=0.1$, fail to reject $H_0$), which is supported by the result of the ADF test which indicates that the series has no unit-root and is either stationary/trend stationary. 
 
 Based on the results of the tests as well as the suspicion of trend-stationarity, the series was detrended in an attempt to achieve stationarity.
 
-```{r,fig.height=2.5,fig.cap="Differenced energy unavailability data and ACF/PACF plots (Non-seasonal)."}
+```{r,fig.height=2.5,fig.cap="Differenced peak daily UCLF+OCLF data and ACF/PACF plots (Non-seasonal)."}
 stl_components=gen_train |>model(STL(unplanned_outages~trend(window=30)))|>components()
 gen_detrended=stl_components|>mutate(detrended = unplanned_outages - trend)
 
@@ -1050,13 +1058,14 @@ colnames(gen_detrended)=c("Date","unplanned_outages")
 gg_tsdisplay(gen_detrended,unplanned_outages, plot_type='partial')
 ```
 
+\newpage
 The figure above displays that detrending the data was adequate in achieving stationarity of the series as the series fluctuates around a constant mean and the variance seems to be fairly constant and time-independent.
 
-The ACF/PACF plots indicate that the model should include both, autoregressive and moving-average components. Findings and discussions in Section 2 highlighted that fitting the correct type of model is crucial for model fit and validity, therefore, we can disregard the use of simple AR or MA models as both components are required. ARIMA models can then also be disregarded as the model does not require any differencing as it is already stationary. An ARMA framework is appropriate for modelling and forecasting the total energy unavailability due to unplanned generation outages.
+The ACF/PACF plots indicate that the model should include both, autoregressive and moving-average components. Findings and discussions in Section 4 highlighted that fitting the correct type of model is crucial for model fit and validity, therefore, the use of simple AR or MA models can be disregarded as both components are required. ARIMA models can then also be disregarded as the model does not require any differencing as it is already stationary. An ARMA framework is appropriate for modelling and forecasting the total peak daily UCLF+OCLF due to unplanned generation outages.
 
-## 3.2 - ARMA model fitting
+## 5.2 - ARMA model fitting
 
-Figure X in Section 3.1 exhibits significant autocorrelation at lag 1 for both ACF and PACF, therefore, $p=1$ and $q=1$ are chosen as the initial candidate model. Both the ACF and PACF exhibit significant autocorrelation at lag 2 and therefore $p=2$ and $q=2$ were chosen for the second candidate model. Finally, in order to try and capture autocorrelation up until higher lags, $p=3$ and $q=4$ were chosen. The table below shows some results from fitting the models.
+Figure 23 in Section 5.1 exhibits a significant spike autocorrelation at lag 1 for both ACF and PACF, therefore, $p=1$ and $q=1$ are chosen as the initial candidate model. Both the ACF and PACF exhibit significant autocorrelation at lag 2 and therefore $p=2$ and $q=2$ were chosen for the second candidate model. Finally, in order to try and capture autocorrelation up until higher lags, $p=3$ and $q=4$ were chosen. The table below shows some results from fitting the models.
 
 ```{r}
 arma_models=gen_detrended|>model(`ARMA(1,1)`=ARIMA(unplanned_outages ~1+pdq(1,0,1)+PDQ(0,0,0)),
@@ -1105,7 +1114,7 @@ aicc_table=cbind(aicc_table,round(rbind(arma11_lb_df[,2:3],arma22_lb_df[,2:3],ar
 kable(aicc_table,col.names = c("Model","AICc","RMSE","Ljung-Box Stat","P-value"),caption="AICc, RMSE and Ljung-Box test results for different ARMA(p,q) models.")
 ```
 
-Based on the results in the table above, the ARMA(2,2) was the chosen model to forecast the total energy unavailability. The choice was made based on:
+Based on the results in the table above, the ARMA(2,2) was the chosen model to forecast the peak daily UCLF+OCLF. The choice was made based on:
 
 \begin{enumerate}
 \item ARMA(2,2) has the second best RMSE
@@ -1113,13 +1122,13 @@ Based on the results in the table above, the ARMA(2,2) was the chosen model to f
 \item The AICc is the lowest of the three models which suggests that the ARMA(3,4) model is not worth the extra complexity.
 \end{enumerate}
 
+\newpage
 
 ```{r,fig.height=2,fig.cap="Forecasts for ARMA(2,2) model."}
 ggplot(arma22_forecast) +
   geom_line(aes(x = Date, y = forecast), color = "blue") +
   geom_ribbon(aes(x = Date, ymin = lower, ymax = upper), fill = "blue", alpha = 0.2) +
-  geom_line(data = gen_train, aes(x = Date, y = unplanned_outages), color = "black") +
-  labs(title = "3 month forecast of Total UCLF+OCLF", x = "Time", y = "Total.UCLF.OCLF")
+  geom_line(data = gen_train, aes(x = Date, y = unplanned_outages), color = "black") +xlab("Time")+ylab("Peak daily UCLF+OCLF")
 ```
 
 The figure above shows that the forecasts made using the ARMA(2,2) model successfully capture the trend in the data but fail to pick up on the smaller fluctuations in the series.
@@ -1132,22 +1141,35 @@ gg_tsdisplay(residuals(arma_selected_model), plot_type='partial')
 
 The residuals resemble a white noise process and the lack of significant autocorrelation in the ACF/PACF plots confirm that the residuals are independent over time and that the model is capturing all available information.
 
-## 3.3 - Benchmark Model/Method
+\newpage
+## 5.3 - Benchmark Model/Method
 
-As discussed in Section 2.4, new models should always be compared to a benchmark forecasting model/method. The Drift forecasting method seems appropriate for this series due to the presence of a linear trend.
+As discussed in Section 4.5, new models should always be compared to a benchmark forecasting model/method [4]. The Drift forecasting method seems appropriate for this series due to the presence of a linear trend. The forecasts plotted below are akin to the forecasts produced by the $ARMA(2,2)$ model.
 
-```{r}
+```{r,fig.height=2,fig.cap="Forecasts for Drift Forecasting Method"}
 drift_model=gen_train |> model(RW(unplanned_outages ~ drift()))
 drift_fc=drift_model|>forecast(h="92 days")
-drift_fc|>autoplot(gen_train)+xlab("Time")+ylab("Total.UCLF.OCLF")+ggtitle("Forecasts for Drift Forecasting Method")
+drift_fc|>autoplot(gen_train)+xlab("Time")+ylab("Peak daily UCLF+OCLF")
 drift_acc =  accuracy(drift_fc$.mean,gen_test$unplanned_outages)
 ```
 
-## 3.4 - ARCH and GARCH
+## 5.4 - Comparison of Mean Forecasting Models/Methods
 
-The returns for total energy unavailability due to unplanned generation outages were calculated (as in Section 2.6) and the relevant plots are shown below. For the same reasons as discussed in Section 2.6, only the last year of observations will be used for the ARCH/GARCH modelling.
+```{r}
+accs = as.data.frame(rbind(arma22_forecast_acc,drift_acc))
+rownames(accs)=c("ARMA(2,2)","Drift")
+kable(round(accs,3)[,c(2,3)],caption="Forecasting accuracies of models/methods for Peak daily UCLF+OCLF")
+```
 
-```{r,fig.height=2,fig.cap="Time and ACF plots of returns/squared returns. Energy Unavailability"}
+
+The ARMA(2,2) model is outperformed by the benchmark Drift forecasting method on the test set. As per Section 4.7 this may be the result of the limitations of only using a single test. Thus I would once again recommend performing more thorough testing of both the ARMA(2,2) model and the Drift forecasting method as additional data becomes available. This will enable more robust and reliable conclusions to be made about which forecasting tool to use.
+\newpage
+
+## 5.5 - ARCH and GARCH
+
+The returns for peak daily UCLF+OCLF due to unplanned generation outages were calculated (as in Section 4.8) and the relevant plots are shown below. For the same reasons as discussed in Section 4.8, only the last year of observations will be used for the ARCH/GARCH modelling.
+
+```{r,fig.height=4,fig.cap="Time and ACF plots of returns/squared returns. Peak daily UCLF+OCLF"}
 gen_out_df = as.data.frame(gen_out)
 gen_out_df$Date=as.Date(gen_out_df$Date)
 gen_out_df=gen_out_df|>filter(Date>="2022-09-14")
@@ -1194,7 +1216,7 @@ rets_grid
 
 The ACF/PACF in the figure above display a lack of autocorrelation in the squared daily returns, this implies that the volatility of the daily returns does not exhibit the kind of clustering and time variation that ARCH/GARCH models are designed to capture. 
 
-To test for ARCH effects such as the previously mentioned volatility clustering and time-varying variance, an ARCH-LM test can be conducted (As specified in Section 2.6).
+To test for ARCH effects such as the previously mentioned volatility clustering and time-varying variance, an ARCH-LM test can be conducted (As specified in Section 4.8).
 
 
 ```{r}
@@ -1202,13 +1224,14 @@ library(FinTS)
 arch_test=ArchTest(gen_log_daily_returns, lags = 7)
 arch_df = round(data.frame(`Test Statistic`=arch_test$statistic,`P-Value`=arch_test$p.value),3)
 kable(arch_df,caption="Results of ARCH-LM test.",row.names = F)
+detach("package:FinTS", unload=TRUE)
 ```
 
 The result of the ARCH-LM test indicates that there is insignificant evidence to suggest that there are ARCH effects present in the series ($p-val=0.638$, fail to reject $H_0$), this supports the notion that the implementation of ARCH/GARCH models to capture the volatility of the series will produce inaccurate results and poor quality residuals. 
 
 To emphasize this, an $ARCH(1)$ and $GARCH(1,1)-ARMA(2,1)$ are fitted to the returns. The ACF/PACF plots of the squared returns show significant autocorrelation at lag 25 which is most likely spurious, however, for the sake of exploration a $GARCH(25,25)-ARMA(2,1)$ was fitted.
 
-```{r}
+```{r,fig.cap="Standardized Residuals and Superimposed conditional SD for ARCH/GARCH models.",fig.height=4,fig.width=6}
 spec_arch1=ugarchspec(variance.model=list(model="sGARCH",garchOrder=c(1,0)),mean.model=list(armaOrder=c(0,0),include.mean=F),distribution.model = "norm")
 arch1=ugarchfit(spec = spec_arch1, data=gen_log_daily_returns)
 
@@ -1218,35 +1241,107 @@ arch2=ugarchfit(spec = spec_arch2, data=gen_log_daily_returns)
 spec_arch3=ugarchspec(variance.model=list(model="sGARCH",garchOrder=c(25,25)),mean.model=list(armaOrder=c(2,1),include.mean=F),distribution.model = "norm")
 arch3=ugarchfit(spec = spec_arch3, data=gen_log_daily_returns)
 
-par(mfrow=c(3,2))
-plot(arch1,which=10)
-plot(arch1,which=1)
-plot(arch2,which=10)
-plot(arch2,which=1)
-plot(arch3,which=10)
-plot(arch3,which=1)
+par(mfrow=c(3,2), mar=c(4, 4, 3, 2))
+{plot(arch1,which=10)
+   mtext("ARCH(1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(arch1,which=1)
+   mtext("ARCH(1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(arch2,which=10)
+   mtext("GARCH(1,1)-ARMA(2,1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(arch2,which=1)
+   mtext("GARCH(1,1)-ARMA(2,1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(arch3,which=10)
+   mtext("GARCH(25,25)-ARMA(2,1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
+{plot(arch3,which=1)
+   mtext("GARCH(25,25)-ARMA(2,1) Model", side = 3, line =1.8, outer = FALSE, cex = 0.6) }
 
 ```
 
 Both the $ARCH(1)$ and $GARCH(1,1)-ARMA(1,1)$ exhibit inadequate fit as the superimposed conditional standard deviation is fitted as straight bands, which confirms that the models are unable to capture the volatility of the series. The standardized residuals for the $ARCH(1)$ show significant autocorrelation at lag 1 whilst for the $GARCH(1,1)-ARMA(2,1)$ and $GARCH(25,25)-ARMA(2,1)$ the first significant spike in autocorrelation is at lag 8. Although the $GARCH(25,25)-ARMA(2,1)$ looks as if it is better capturing the volatility it is essentially performing the same as the other two models, as the conditional standard deviation bands are just fluctuating around some mean and not actually capturing the spikes in the returns and therefore not capturing the volatility. 
 
 
-## 3.5 - Comparison of Forecasting models/methods
+## 5.6 - Comparison of Volatility Forecasting Models
+According to the tests and investigation conducted in Section 5.5 the returns of the peak daily UCLF+OCLF exhibit no significant ARCH effects (which includes volatility clustering and time-varying variance) and therefore the use of ARCH/GARCH models to model the volatility in the series is not appropriate as presented in the discussion of the models in Section 5.5. I would recommend using alternative methods or models such as an Exponential Weighted Moving Average (EWMA) to produce robust forecasts of the volatility of the returns of the peak daily UCLF+OCLF.
+\newpage
 
-### 3.5.1 - Mean Forecasting Models/Methods
+# Section 6 - Discussion and Limitations
 
+As hypothesized, clear weekly and annual seasonal patterns were present in the daily peak demand series. This led to the SARIMA models outperforming the non-seasonal models as they were able to capture the seasonality in the series. The strong seasonality present in the series proved to play a large role in modelling the volatility of the series and thus the basic ARCH/GARCH-ARMA models that were fitted were found to be inadequate, presenting the need for a model that directly accounts for the seasonality in the returns.
+
+The peak daily UCLF+OCLF was found to have a positive linear trend and no clear weekly or annual seasonality (as hypothesized) which implies that it is not greatly affected by the changing seasons or weekends/holidays. Therefore a non-seasonal ARMA model was found to be the best model based on forecasting accuracy and model complexity. 
+
+The volatility of the peak daily UCLF+OCLF was hypothesized to be higher in the peaks of winter and summer than in transitional seasons such as spring and autumn. The analysis in Section 5.5 suggests that there is insufficient evidence to support this claim.
+As a matter of fact the ARCH/GARCH models did not adequately capture the volatility in both the peak daily demand and the peak daily UCLF+OCLF.
+
+The forecasts provided by Eskom were very accurate on the test set and align almost exactly how you'd expect given the historical data. Although as discussed in Section 4.6 the residuals of Eskom's forecasts suggest that the model/method they used was still not capturing all available information. Unfortunately the methodology of how Eskom produced these forecasts was not provided and thus can't be improved upon.
+
+The forecasts of the peak daily demand as well as the peak daily UCLF+OCLF are limited by the use of time series models that do not include other exogenous variables. This could be addressed through the use of the relevant SARIMAX or ARIMAX models which incorporate other predictors into the model which can provide more insight into what impacts the variables that are being forecasted. 
+
+The ARMA model used to forecast the peak daily UCLF+OCLF will struggle to adapt if the trend changes over time which is quite likely due to the assignment of funds and resources to maintaining Eskom power plants being an ongoing discussion.
+
+
+# Section 7 - Conclusions
+
+In this analysis, AR/MA/ARMA/ARIMA and SARIMA models, were developed in order to produce forecasts for each the values of the peak daily electricity demand as well as the peak daily UCLF+OCLF. The models were evaluated based on a residual analysis and forecasting accuracy (RMSE). ARCH and GARCH models were also used to capture the volatility of both the peak daily electricity demand and the peak daily UCLF+OCLF.
+
+It was shown that choice of the $SARIMA(7,1,7)(2,1,1)[7]+Fourier(365)$ model to produce robust forecasts of the peak daily demand is satisfactory based on the results obtained in the analysis,however, as mentioned in Section 4.7, if the Seasonal Naive method continues to outperform the SARIMA model, then the Seasonal Naive should be used due to its simplicity, interpretability and low computational complexity. The fine-tuning and further improvement of the SARIMA model by extending it to include exogenous variables should be taken into strong consideration. For forecasting the volatility, the results determined that a model such as a GARCH-SARIMA model should be used due to the strong weekly seasonality in the data. 
+
+Robust forecasts of the peak daily UCLF+OCLF can be produced using either the $ARMA(2,2)$ model or the Drift forecasting method as discussed in the analysis. As more data becomes available the best choice between the two will present itself. The analysis showed that to produce robust forecasts for the peak daily UCLF+OCLF, other methods or models such as EWMA should be implemented as ARCH/GARCH are not suited to modelling the time-independent volatility in this series.
+
+By anticipating electricity demand and energy unavailability effective strategies can be developed to assist in mitigating load shedding and enhancing grid stability whilst optimizing resource allocation and plant maintenance. 
+
+# References
+[1] Electricity Patterns Explained, Eskom, https://www.eskom.co.za/eas/power-alert-2/#:~:text=In%20South%20Africa%2C%20peak%20demand,the%20impact%20of%20residential%20consumers.
+
+[2] Demand Side, Eskom,https://www.eskom.co.za/dataportal/demand-side/
+
+[3] Ljung-Box Test, MathWorks,https://www.mathworks.com/help/econ/lbqtest.html
+
+[4] Hyndman,R.J., & Athanasopoulos, G.,Forecasting: Principles and Practice (3rd ed.).OTexts, https://otexts.com/fpp3/
+
+[5] STA 510 Applied Time Series Analysis - ARCH/GARCH models, Penn State Eberly College of Science, https://online.stat.psu.edu/stat510/lesson/11/11.1
+
+[6] Trend-Stationary vs. Difference-Stationary Processes, MathWorks, https://www.mathworks.com/help/econ/trend-stationary-vs-difference-stationary.html
+
+# Appendix
+
+## 1.1
 ```{r}
-accs = as.data.frame(rbind(arma22_forecast_acc,drift_acc))
-rownames(accs)=c("ARMA(2,2)","Drift")
-kable(round(accs,3)[,c(2,3)],caption="Forecasting accuracies of models/methods for Total.UCLF.OCLF")
+# # Appendix
+variables=matrix(c("Date","Date","RSA.Contracted.Demand","numeric","RSA.Contracted.Forecast","numeric","Total.UCLF.OCLF","numeric"),ncol=2,byrow=T)
+
+colnames(variables)=c("Variable Name","Variable Type")
+kable(variables,row.names = F,caption="The variables of the ESK6816 dataset and their variable types.")
 ```
 
+## 1.2
+```{r}
+ar_aic_tbl
+ma_aic_tbl
+arma_aic_tbl
+arima_aic_tbl
+```
 
-The ARMA(2,2) model is outperformed by the benchmark Drift forecasting method on the test set. As per Section 2.7.1 this may be the result of the limitations of only using a single test. Thus I would once again recommend performing more thorough testing of both the ARMA(2,2) model and the Drift forecasting method as additional data becomes available. This will enable more robust and reliable conclusions to be made about which forecasting tool to use.
+## 1.3
 
-### 3.5.2 - Volatility Forecasting Models
-According to the tests and investigation conducted in Section 3.4 the returns of $Total.UCLF.OCLF$ exhibit no significant ARCH effects (which includes volatility clustering and time-varying variance) and therefore the use of ARCH/GARCH models to model the volatility in the series is not appropriate as presented in the discussion of the models in Section 3.4. I would recommend using alternative methods or models such as an Exponential Weighted Moving Average (EWMA) to produce robust forecasts of the volatility of the returns of $Total.UCLF.OCLF$.
+```{r,fig.height=3,fig.cap="Residual plot for AR(8) model"}
+gg_tsdisplay(residuals(selected_ar_model),plot_type = "partial")
+```
 
-# Conclusion 
+```{r,fig.height=3,fig.cap="Residual plot for MA(7) model"}
+gg_tsdisplay(residuals(ma_selected_model),plot_type = "partial")
+```
 
-\*Could investigate if water supply correlates with unplanned outages
+```{r,fig.height=3,fig.cap="Residual plot for ARMA(5,6) model"}
+gg_tsdisplay(residuals(arma_selected_model),plot_type = "partial")
+```
+
+```{r,fig.height=3,fig.cap="Residual plot for ARIMA(5,1,4) model"}
+gg_tsdisplay(residuals(arima_selected_model),plot_type = "partial")
+```
+
+## 1.4
+```{r,fig.height=6,fig.width=10,fig.cap="Forecasts for non-seasonal models"}
+fc_grid = (ar_fc_plot | ma_fc_plot) / (arma_fc_plot | arima_fc_plot)
+fc_grid
+```
